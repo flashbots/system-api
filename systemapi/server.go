@@ -1,11 +1,11 @@
-package main
+// Package systemapi provides components for the System API service.
+package systemapi
 
 import (
 	"bufio"
 	"context"
 	"encoding/json"
 	"errors"
-	"log/slog"
 	"net/http"
 	"os"
 	"strings"
@@ -16,13 +16,14 @@ import (
 	"github.com/flashbots/system-api/common"
 	chi "github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
+	"github.com/go-chi/httplog/v2"
 )
 
 var MaxEvents = common.GetEnvInt("MAX_EVENTS", 1000)
 
 type HTTPServerConfig struct {
 	ListenAddr   string
-	Log          *slog.Logger
+	Log          *httplog.Logger
 	PipeFilename string
 	EnablePprof  bool
 
@@ -39,7 +40,7 @@ type Event struct {
 
 type Server struct {
 	cfg *HTTPServerConfig
-	log *slog.Logger
+	log *httplog.Logger
 
 	srv *http.Server
 
@@ -65,25 +66,33 @@ func NewServer(cfg *HTTPServerConfig) (srv *Server, err error) {
 		go srv.readPipeInBackground()
 	}
 
-	mux := chi.NewRouter()
-	mux.With(srv.httpLogger).Get("/", srv.handleLivenessCheck)
-	mux.With(srv.httpLogger).Get("/livez", srv.handleLivenessCheck)
-	mux.With(srv.httpLogger).Get("/api/v1/new_event", srv.handleNewEvent)
-	mux.With(srv.httpLogger).Get("/api/v1/events", srv.handleGetEvents)
-
-	if cfg.EnablePprof {
-		srv.log.Info("pprof API enabled")
-		mux.Mount("/debug", middleware.Profiler())
-	}
-
 	srv.srv = &http.Server{
 		Addr:         cfg.ListenAddr,
-		Handler:      mux,
+		Handler:      srv.getRouter(),
 		ReadTimeout:  cfg.ReadTimeout,
 		WriteTimeout: cfg.WriteTimeout,
 	}
 
 	return srv, nil
+}
+
+func (s *Server) getRouter() http.Handler {
+	mux := chi.NewRouter()
+
+	mux.Use(httplog.RequestLogger(s.log))
+	mux.Use(middleware.Recoverer)
+
+	mux.Get("/", s.handleLivenessCheck)
+	mux.Get("/livez", s.handleLivenessCheck)
+	mux.Get("/api/v1/new_event", s.handleNewEvent)
+	mux.Get("/api/v1/events", s.handleGetEvents)
+
+	if s.cfg.EnablePprof {
+		s.log.Info("pprof API enabled")
+		mux.Mount("/debug", middleware.Profiler())
+	}
+
+	return mux
 }
 
 func (s *Server) readPipeInBackground() {
@@ -106,10 +115,6 @@ func (s *Server) readPipeInBackground() {
 			})
 		}
 	}
-}
-
-func (s *Server) httpLogger(next http.Handler) http.Handler {
-	return common.LoggingMiddlewareSlog(s.log, next)
 }
 
 func (s *Server) Start() {

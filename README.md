@@ -22,14 +22,14 @@ Future features:
 
 ```bash
 # Start the server
-$ go run cmd/system-api/*
+$ go run cmd/system-api/main.go
 
 # Add events
 $ echo "hello world" > pipe.fifo
-$ curl localhost:8082/api/v1/new_event?message=this+is+a+test
+$ curl localhost:3535/api/v1/new_event?message=this+is+a+test
 
 # Query events (plain text or JSON is supported)
-$ curl -s localhost:8082/api/v1/events?format=text
+$ curl -s localhost:3535/api/v1/events?format=text
 2024-10-23T12:04:01Z     hello world
 2024-10-23T12:04:07Z     this is a test
 ```

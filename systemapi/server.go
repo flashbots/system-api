@@ -3,23 +3,22 @@ package systemapi
 
 import (
 	"bufio"
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
 	"net/http"
 	"os"
+	"os/exec"
 	"strings"
 	"sync"
 	"syscall"
 	"time"
 
-	"github.com/flashbots/system-api/common"
 	chi "github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/go-chi/httplog/v2"
 )
-
-var MaxEvents = common.GetEnvInt("MAX_EVENTS", 1000)
 
 type HTTPServerConfig struct {
 	ListenAddr   string
@@ -31,6 +30,8 @@ type HTTPServerConfig struct {
 	GracefulShutdownDuration time.Duration
 	ReadTimeout              time.Duration
 	WriteTimeout             time.Duration
+
+	Config *SystemAPIConfig
 }
 
 type Event struct {
@@ -86,6 +87,7 @@ func (s *Server) getRouter() http.Handler {
 	mux.Get("/livez", s.handleLivenessCheck)
 	mux.Get("/api/v1/new_event", s.handleNewEvent)
 	mux.Get("/api/v1/events", s.handleGetEvents)
+	mux.Get("/api/v1/actions/{action}", s.handleAction)
 
 	if s.cfg.EnablePprof {
 		s.log.Info("pprof API enabled")
@@ -190,4 +192,41 @@ func (s *Server) handleGetEvents(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
+}
+
+func (s *Server) handleAction(w http.ResponseWriter, r *http.Request) {
+	action := chi.URLParam(r, "action")
+	s.log.Info("Received action", "action", action)
+
+	if s.cfg.Config == nil {
+		w.WriteHeader(http.StatusNotImplemented)
+		return
+	}
+
+	cmd, ok := s.cfg.Config.Actions[action]
+	if !ok {
+		w.WriteHeader(http.StatusNotImplemented)
+		return
+	}
+
+	s.log.Info("Executing action", "action", action, "cmd", cmd)
+	stdout, stderr, err := Shellout(cmd)
+	if err != nil {
+		s.log.Error("Failed to execute action", "action", action, "cmd", cmd, "err", err, "stderr", stderr)
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	s.log.Info("Action executed", "action", action, "cmd", cmd, "stdout", stdout, "stderr", stderr)
+	w.WriteHeader(http.StatusOK)
+}
+
+func Shellout(command string) (string, string, error) {
+	var stdout bytes.Buffer
+	var stderr bytes.Buffer
+	cmd := exec.Command(ShellToUse, "-c", command)
+	cmd.Stdout = &stdout
+	cmd.Stderr = &stderr
+	err := cmd.Run()
+	return stdout.String(), stderr.String(), err
 }

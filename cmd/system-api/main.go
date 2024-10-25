@@ -9,13 +9,14 @@ import (
 	"time"
 
 	"github.com/flashbots/system-api/common"
+	"github.com/flashbots/system-api/systemapi"
 	cli "github.com/urfave/cli/v2" // imports as package "cli"
 )
 
 var flags []cli.Flag = []cli.Flag{
 	&cli.StringFlag{
 		Name:  "listen-addr",
-		Value: "0.0.0.0:8082",
+		Value: "0.0.0.0:3535",
 		Usage: "address to serve certificate on",
 	},
 	&cli.StringFlag{
@@ -48,7 +49,7 @@ func runCli(cCtx *cli.Context) error {
 	})
 
 	// Setup and start the server (in the background)
-	server, err := NewServer(&HTTPServerConfig{
+	server, err := systemapi.NewServer(&systemapi.HTTPServerConfig{
 		ListenAddr:   listenAddr,
 		Log:          log,
 		PipeFilename: pipeFile,

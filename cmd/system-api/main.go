@@ -24,6 +24,16 @@ var flags []cli.Flag = []cli.Flag{
 		Value: "pipe.fifo",
 		Usage: "filename for named pipe (for sending events into this service)",
 	},
+	&cli.BoolFlag{
+		Name:  "log-json",
+		Value: false,
+		Usage: "log in JSON format",
+	},
+	&cli.BoolFlag{
+		Name:  "log-debug",
+		Value: true,
+		Usage: "log debug messages",
+	},
 }
 
 func main() {
@@ -43,9 +53,19 @@ func main() {
 func runCli(cCtx *cli.Context) error {
 	listenAddr := cCtx.String("listen-addr")
 	pipeFile := cCtx.String("pipe-file")
+	logJSON := cCtx.Bool("log-json")
+	logDebug := cCtx.Bool("log-debug")
+
+	logTags := map[string]string{
+		"version": common.Version,
+	}
 
 	log := common.SetupLogger(&common.LoggingOpts{
-		Version: common.Version,
+		JSON:           logJSON,
+		Debug:          logDebug,
+		Concise:        true,
+		RequestHeaders: true,
+		Tags:           logTags,
 	})
 
 	// Setup and start the server (in the background)

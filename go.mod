@@ -7,6 +7,7 @@ toolchain go1.23.1
 require (
 	github.com/ethereum/go-ethereum v1.14.9
 	github.com/go-chi/chi/v5 v5.1.0
+	github.com/go-chi/httplog/v2 v2.1.1
 	github.com/urfave/cli/v2 v2.27.2
 )
 

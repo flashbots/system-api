@@ -34,6 +34,11 @@ var flags []cli.Flag = []cli.Flag{
 		Value: true,
 		Usage: "log debug messages",
 	},
+	&cli.StringFlag{
+		Name:  "config",
+		Value: "",
+		Usage: "config file",
+	},
 }
 
 func main() {
@@ -50,7 +55,7 @@ func main() {
 	}
 }
 
-func runCli(cCtx *cli.Context) error {
+func runCli(cCtx *cli.Context) (err error) {
 	listenAddr := cCtx.String("listen-addr")
 	pipeFile := cCtx.String("pipe-file")
 	logJSON := cCtx.Bool("log-json")
@@ -59,6 +64,7 @@ func runCli(cCtx *cli.Context) error {
 	logTags := map[string]string{
 		"version": common.Version,
 	}
+	configFile := cCtx.String("config")
 
 	log := common.SetupLogger(&common.LoggingOpts{
 		JSON:           logJSON,
@@ -68,12 +74,24 @@ func runCli(cCtx *cli.Context) error {
 		Tags:           logTags,
 	})
 
+	var config *systemapi.SystemAPIConfig
+	if configFile != "" {
+		config, err = systemapi.LoadConfigFromFile(configFile)
+		if err != nil {
+			log.Error("Error loading config", "err", err)
+			return err
+		}
+		log.Info("Loaded config", "config-file", config)
+	}
+
 	// Setup and start the server (in the background)
-	server, err := systemapi.NewServer(&systemapi.HTTPServerConfig{
+	cfg := &systemapi.HTTPServerConfig{
 		ListenAddr:   listenAddr,
 		Log:          log,
 		PipeFilename: pipeFile,
-	})
+		Config:       config,
+	}
+	server, err := systemapi.NewServer(cfg)
 	if err != nil {
 		return err
 	}

@@ -3,18 +3,19 @@ package systemapi
 
 import (
 	"bufio"
-	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
+	"io"
 	"net/http"
 	"os"
-	"os/exec"
 	"strings"
 	"sync"
 	"syscall"
 	"time"
 
+	"github.com/flashbots/system-api/common"
 	chi "github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/go-chi/httplog/v2"
@@ -88,6 +89,7 @@ func (s *Server) getRouter() http.Handler {
 	mux.Get("/api/v1/new_event", s.handleNewEvent)
 	mux.Get("/api/v1/events", s.handleGetEvents)
 	mux.Get("/api/v1/actions/{action}", s.handleAction)
+	mux.Post("/api/v1/file-upload/{file}", s.handleFileUpload)
 
 	if s.cfg.EnablePprof {
 		s.log.Info("pprof API enabled")
@@ -155,6 +157,13 @@ func (s *Server) addEvent(event Event) {
 	s.eventsLock.Unlock()
 }
 
+func (s *Server) addInternalEvent(msg string) {
+	s.addEvent(Event{
+		ReceivedAt: time.Now().UTC(),
+		Message:    "[system-api] " + msg,
+	})
+}
+
 func (s *Server) handleNewEvent(w http.ResponseWriter, r *http.Request) {
 	msg := r.URL.Query().Get("message")
 	s.log.Info("Received new event", "message", msg)
@@ -205,28 +214,66 @@ func (s *Server) handleAction(w http.ResponseWriter, r *http.Request) {
 
 	cmd, ok := s.cfg.Config.Actions[action]
 	if !ok {
-		w.WriteHeader(http.StatusNotImplemented)
+		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
 
 	s.log.Info("Executing action", "action", action, "cmd", cmd)
-	stdout, stderr, err := Shellout(cmd)
+	s.addInternalEvent("executing action: " + action + " = " + cmd)
+
+	stdout, stderr, err := common.Shellout(cmd)
 	if err != nil {
 		s.log.Error("Failed to execute action", "action", action, "cmd", cmd, "err", err, "stderr", stderr)
+		s.addInternalEvent("error executing action: " + action + " - error: " + err.Error() + " (stderr: " + stderr + ")")
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
 
 	s.log.Info("Action executed", "action", action, "cmd", cmd, "stdout", stdout, "stderr", stderr)
+	s.addInternalEvent("executing action success: " + action + " = " + cmd)
 	w.WriteHeader(http.StatusOK)
 }
 
-func Shellout(command string) (string, string, error) {
-	var stdout bytes.Buffer
-	var stderr bytes.Buffer
-	cmd := exec.Command(ShellToUse, "-c", command)
-	cmd.Stdout = &stdout
-	cmd.Stderr = &stderr
-	err := cmd.Run()
-	return stdout.String(), stderr.String(), err
+func (s *Server) handleFileUpload(w http.ResponseWriter, r *http.Request) {
+	fileArg := chi.URLParam(r, "file")
+	log := s.log.With("file", fileArg)
+	log.Info("Receiving file upload")
+
+	if s.cfg.Config == nil {
+		w.WriteHeader(http.StatusNotImplemented)
+		return
+	}
+
+	filename, ok := s.cfg.Config.FileUploads[fileArg]
+	if !ok {
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+
+	log = log.With("filename", filename)
+	s.addInternalEvent("file upload: " + fileArg + " = " + filename)
+
+	// 1. read content from payload r.Body
+	content, err := io.ReadAll(r.Body)
+	if err != nil {
+		log.Error("Failed to read content from payload", "err", err)
+		s.addInternalEvent("file upload error (failed to read): " + fileArg + " = " + filename + " - error: " + err.Error())
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	log.Debug("Content read from payload", "content", string(content))
+
+	// 2. write content to file
+	err = os.WriteFile(filename, content, 0o600)
+	if err != nil {
+		log.Error("Failed to write content to file", "err", err)
+		s.addInternalEvent("file upload error (failed to write): " + fileArg + " = " + filename + " - error: " + err.Error())
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	log.Info("File uploaded")
+	s.addInternalEvent(fmt.Sprintf("file upload success: %s = %s - content: %d bytes", fileArg, filename, len(content)))
+	w.WriteHeader(http.StatusOK)
 }

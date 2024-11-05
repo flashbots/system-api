@@ -3,3 +3,6 @@
 # rbuilder_restart = "/etc/init.d/rbuilder restart"
 # rbuilder_stop = "/etc/init.d/rbuilder stop"
 echo_test = "echo test"
+
+[file_uploads]
+testfile = "/tmp/testfile.txt"

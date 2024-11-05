@@ -3,18 +3,18 @@ package systemapi
 
 import (
 	"bufio"
-	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
+	"io"
 	"net/http"
 	"os"
-	"os/exec"
 	"strings"
 	"sync"
 	"syscall"
 	"time"
 
+	"github.com/flashbots/system-api/common"
 	chi "github.com/go-chi/chi/v5"
 	"github.com/go-chi/chi/v5/middleware"
 	"github.com/go-chi/httplog/v2"
@@ -88,6 +88,7 @@ func (s *Server) getRouter() http.Handler {
 	mux.Get("/api/v1/new_event", s.handleNewEvent)
 	mux.Get("/api/v1/events", s.handleGetEvents)
 	mux.Get("/api/v1/actions/{action}", s.handleAction)
+	mux.Post("/api/v1/file-upload/{file}", s.handleFileUpload)
 
 	if s.cfg.EnablePprof {
 		s.log.Info("pprof API enabled")
@@ -205,12 +206,12 @@ func (s *Server) handleAction(w http.ResponseWriter, r *http.Request) {
 
 	cmd, ok := s.cfg.Config.Actions[action]
 	if !ok {
-		w.WriteHeader(http.StatusNotImplemented)
+		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
 
 	s.log.Info("Executing action", "action", action, "cmd", cmd)
-	stdout, stderr, err := Shellout(cmd)
+	stdout, stderr, err := common.Shellout(cmd)
 	if err != nil {
 		s.log.Error("Failed to execute action", "action", action, "cmd", cmd, "err", err, "stderr", stderr)
 		w.WriteHeader(http.StatusInternalServerError)
@@ -221,12 +222,42 @@ func (s *Server) handleAction(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 }
 
-func Shellout(command string) (string, string, error) {
-	var stdout bytes.Buffer
-	var stderr bytes.Buffer
-	cmd := exec.Command(ShellToUse, "-c", command)
-	cmd.Stdout = &stdout
-	cmd.Stderr = &stderr
-	err := cmd.Run()
-	return stdout.String(), stderr.String(), err
+func (s *Server) handleFileUpload(w http.ResponseWriter, r *http.Request) {
+	fileArg := chi.URLParam(r, "file")
+	log := s.log.With("file", fileArg)
+	log.Info("Received file upload")
+
+	if s.cfg.Config == nil {
+		w.WriteHeader(http.StatusNotImplemented)
+		return
+	}
+
+	filename, ok := s.cfg.Config.FileUploads[fileArg]
+	if !ok {
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+
+	log = log.With("filename", filename)
+
+	// 1. read content from payload r.Body
+	content, err := io.ReadAll(r.Body)
+	if err != nil {
+		log.Error("Failed to read content from payload", "err", err)
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	log.Debug("Content read from payload", "content", string(content))
+
+	// 2. write content to file
+	err = os.WriteFile(filename, content, 0o600)
+	if err != nil {
+		log.Error("Failed to write content to file", "err", err)
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	log.Info("File uploaded")
+	w.WriteHeader(http.StatusOK)
 }

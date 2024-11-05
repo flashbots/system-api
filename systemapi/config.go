@@ -7,7 +7,8 @@ import (
 )
 
 type SystemAPIConfig struct {
-	Actions map[string]string
+	Actions     map[string]string
+	FileUploads map[string]string `toml:"file_uploads"`
 }
 
 func LoadConfigFromFile(path string) (*SystemAPIConfig, error) {

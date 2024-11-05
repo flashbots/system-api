@@ -8,17 +8,17 @@ It currently does the following things:
  used to record and query events. Useful to record service startup/shutdown, errors, progress updates,
  hashes, etc.
 - **Actions**: Ability to execute shell commands via API
+- **Configuration** through file uploads
 
 Future features:
 
-- Operator can set a password for http-basic-auth (persisted, for all future requests)
-- Operator-provided configuration (i.e. config values, secrets, etc.)
+- Set a password for http-basic-auth (persisted, for all future requests)
 
 ---
 
  ## Event log
 
- Events can be added via local named pipe (i.e. file `pipe.fifo`) or through HTTP API:
+Events can be added via local named pipe (i.e. file `pipe.fifo`) or through HTTP API:
 
 ```bash
 # Start the server
@@ -45,4 +45,16 @@ $ go run cmd/system-api/main.go --config systemapi-config.toml
 
 # Execute the example action
 $ curl -v localhost:3535/api/v1/actions/echo_test
+```
+
+## File Uploads
+
+Upload destinations are defined in the config file (see [systemapi-config.toml](./systemapi-config.toml)).
+
+```bash
+# Start the server
+$ go run cmd/system-api/main.go --config systemapi-config.toml
+
+# Execute the example action
+$ curl -v -X POST -d "@README.md" localhost:3535/api/v1/file-upload/testfile
 ```

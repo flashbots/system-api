@@ -1,3 +1,6 @@
 package common
 
-var Version = "dev"
+var (
+	Version    = "dev"
+	ShellToUse = GetEnv("SHELL_TO_USE", "/bin/ash")
+)

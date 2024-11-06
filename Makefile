@@ -16,6 +16,10 @@ build:
 	@mkdir -p ./build
 	go build -trimpath -ldflags "-X github.com/flashbots/system-api/common.Version=${VERSION}" -v -o ./build/system-api cmd/system-api/*.go
 
+.PHONY: run
+run:
+	SHELL_TO_USE=/bin/bash go run cmd/system-api/main.go --config systemapi-config.toml
+
 # .PHONY: build-httpserver
 # build-httpserver:
 # 	@mkdir -p ./build

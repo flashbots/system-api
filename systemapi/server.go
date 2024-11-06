@@ -265,7 +265,7 @@ func (s *Server) handleFileUpload(w http.ResponseWriter, r *http.Request) {
 	log.Debug("Content read from payload", "content", string(content))
 
 	// 2. write content to file
-	err = os.WriteFile(filename, content, 0o600)
+	err = os.WriteFile(filename, content, 0o644) //nolint:gosec
 	if err != nil {
 		log.Error("Failed to write content to file", "err", err)
 		s.addInternalEvent("file upload error (failed to write): " + fileArg + " = " + filename + " - error: " + err.Error())

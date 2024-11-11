@@ -1,6 +1,9 @@
 # System API
 
-System API is used as interface between TDX services and the operator.
+[![Goreport status](https://goreportcard.com/badge/github.com/flashbots/system-api)](https://goreportcard.com/report/github.com/flashbots/system-api)
+[![Test status](https://github.com/flashbots/system-api/actions/workflows/checks.yml/badge.svg?branch=main)](https://github.com/flashbots/system-api/actions?query=workflow%3A%22Checks%22)
+
+System API is an interface between TDX VMs and it's services and the operator.
 
 It currently does the following things:
 

@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"log"
 	"os"
 	"os/signal"
@@ -23,16 +24,6 @@ var flags []cli.Flag = []cli.Flag{
 		Name:  "pipe-file",
 		Value: "pipe.fifo",
 		Usage: "filename for named pipe (for sending events into this service)",
-	},
-	&cli.BoolFlag{
-		Name:  "log-json",
-		Value: false,
-		Usage: "log in JSON format",
-	},
-	&cli.BoolFlag{
-		Name:  "log-debug",
-		Value: true,
-		Usage: "log debug messages",
 	},
 	&cli.StringFlag{
 		Name:  "config",
@@ -56,40 +47,53 @@ func main() {
 }
 
 func runCli(cCtx *cli.Context) (err error) {
+	configFile := cCtx.String("config")
 	listenAddr := cCtx.String("listen-addr")
 	pipeFile := cCtx.String("pipe-file")
-	logJSON := cCtx.Bool("log-json")
-	logDebug := cCtx.Bool("log-debug")
 
+	// Load configuration file
+	config := systemapi.NewSystemAPIConfig()
+	if configFile != "" {
+		config, err = systemapi.LoadConfigFromFile(configFile)
+		if err != nil {
+			fmt.Println("Error loading config", err)
+			return err
+		}
+	}
+
+	// Override unset cli flags with config file values
+	if listenAddr == "" {
+		config.General.ListenAddr = listenAddr
+	}
+	if pipeFile == "" {
+		config.General.PipeFile = pipeFile
+	}
+
+	// Setup logging
 	logTags := map[string]string{
 		"version": common.Version,
 	}
-	configFile := cCtx.String("config")
 
 	log := common.SetupLogger(&common.LoggingOpts{
-		JSON:           logJSON,
-		Debug:          logDebug,
+		JSON:           config.General.LogJSON,
+		Debug:          config.General.LogDebug,
 		Concise:        true,
 		RequestHeaders: true,
 		Tags:           logTags,
 	})
 
-	var config *systemapi.SystemAPIConfig
-	if configFile != "" {
-		config, err = systemapi.LoadConfigFromFile(configFile)
-		if err != nil {
-			log.Error("Error loading config", "err", err)
-			return err
-		}
-		log.Info("Loaded config", "config-file", config)
-	}
+	// Print configuration
+	log.Info("config:",
+		"listenAddr", config.General.ListenAddr,
+		"pipeFile", config.General.PipeFile,
+		"logJSON", config.General.LogJSON,
+		"logDebug", config.General.LogDebug,
+	)
 
 	// Setup and start the server (in the background)
 	cfg := &systemapi.HTTPServerConfig{
-		ListenAddr:   listenAddr,
-		Log:          log,
-		PipeFilename: pipeFile,
-		Config:       config,
+		Log:    log,
+		Config: config,
 	}
 	server, err := systemapi.NewServer(cfg)
 	if err != nil {

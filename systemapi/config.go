@@ -6,7 +6,16 @@ import (
 	toml "github.com/pelletier/go-toml/v2"
 )
 
+type systemAPIConfigGeneral struct {
+	ListenAddr string `toml:"listen_addr"`
+	PipeFile   string `toml:"pipe_file"`
+	LogJSON    bool   `toml:"log_json"`
+	LogDebug   bool   `toml:"log_debug"`
+}
+
 type SystemAPIConfig struct {
+	General systemAPIConfigGeneral
+
 	Actions     map[string]string
 	FileUploads map[string]string `toml:"file_uploads"`
 }
@@ -26,4 +35,12 @@ func LoadConfig(content []byte) (*SystemAPIConfig, error) {
 		return nil, err
 	}
 	return cfg, nil
+}
+
+func NewSystemAPIConfig() *SystemAPIConfig {
+	return &SystemAPIConfig{
+		General:     systemAPIConfigGeneral{},
+		Actions:     make(map[string]string),
+		FileUploads: make(map[string]string),
+	}
 }

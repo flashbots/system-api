@@ -22,17 +22,14 @@ import (
 )
 
 type HTTPServerConfig struct {
-	ListenAddr   string
-	Log          *httplog.Logger
-	PipeFilename string
-	EnablePprof  bool
+	Config      *SystemAPIConfig
+	Log         *httplog.Logger
+	EnablePprof bool
 
 	DrainDuration            time.Duration
 	GracefulShutdownDuration time.Duration
 	ReadTimeout              time.Duration
 	WriteTimeout             time.Duration
-
-	Config *SystemAPIConfig
 }
 
 type Event struct {
@@ -58,9 +55,9 @@ func NewServer(cfg *HTTPServerConfig) (srv *Server, err error) {
 		events: make([]Event, 0),
 	}
 
-	if cfg.PipeFilename != "" {
-		os.Remove(cfg.PipeFilename)
-		err := syscall.Mknod(cfg.PipeFilename, syscall.S_IFIFO|0o666, 0)
+	if cfg.Config.General.PipeFile != "" {
+		os.Remove(cfg.Config.General.PipeFile)
+		err := syscall.Mknod(cfg.Config.General.PipeFile, syscall.S_IFIFO|0o666, 0)
 		if err != nil {
 			return nil, err
 		}
@@ -69,7 +66,7 @@ func NewServer(cfg *HTTPServerConfig) (srv *Server, err error) {
 	}
 
 	srv.srv = &http.Server{
-		Addr:         cfg.ListenAddr,
+		Addr:         cfg.Config.General.ListenAddr,
 		Handler:      srv.getRouter(),
 		ReadTimeout:  cfg.ReadTimeout,
 		WriteTimeout: cfg.WriteTimeout,
@@ -100,7 +97,7 @@ func (s *Server) getRouter() http.Handler {
 }
 
 func (s *Server) readPipeInBackground() {
-	file, err := os.OpenFile(s.cfg.PipeFilename, os.O_CREATE, os.ModeNamedPipe)
+	file, err := os.OpenFile(s.cfg.Config.General.PipeFile, os.O_CREATE, os.ModeNamedPipe)
 	if err != nil {
 		s.log.Error("Open named pipe file error:", "error", err)
 		return
@@ -122,7 +119,7 @@ func (s *Server) readPipeInBackground() {
 }
 
 func (s *Server) Start() {
-	s.log.Info("Starting HTTP server", "listenAddress", s.cfg.ListenAddr)
+	s.log.Info("Starting HTTP server", "listenAddress", s.cfg.Config.General.ListenAddr)
 	if err := s.srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 		s.log.Error("HTTP server failed", "err", err)
 	}
@@ -135,8 +132,8 @@ func (s *Server) Shutdown(ctx context.Context) error {
 		s.log.Error("HTTP server shutdown failed", "err", err)
 	}
 
-	if s.cfg.PipeFilename != "" {
-		os.Remove(s.cfg.PipeFilename)
+	if s.cfg.Config.General.PipeFile != "" {
+		os.Remove(s.cfg.Config.General.PipeFile)
 	}
 
 	s.log.Info("HTTP server shutdown")

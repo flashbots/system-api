@@ -10,20 +10,23 @@ import (
 func BasicAuth(realm string, getCreds func() map[string]string) func(next http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			// Loading credentials dynamically because they can be updated at runtime
 			creds := getCreds()
 
+			// If no credentials are set, just pass through (unauthenticated)
 			if len(creds) == 0 {
-				// if no credentials are set, just pass through
 				next.ServeHTTP(w, r)
 				return
 			}
 
+			// Load credentials from request
 			user, pass, ok := r.BasicAuth()
 			if !ok {
 				basicAuthFailed(w, realm)
 				return
 			}
 
+			// Compare to allowed credentials
 			credPass, credUserOk := creds[user]
 			if !credUserOk || subtle.ConstantTimeCompare([]byte(pass), []byte(credPass)) != 1 {
 				basicAuthFailed(w, realm)

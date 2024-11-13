@@ -88,6 +88,7 @@ func (s *Server) getRouter() http.Handler {
 	mux.Get("/livez", s.handleLivenessCheck)
 	mux.Get("/api/v1/new_event", s.handleNewEvent)
 	mux.Get("/api/v1/events", s.handleGetEvents)
+	mux.Get("/logs", s.handleGetLogs)
 	mux.Get("/api/v1/actions/{action}", s.handleAction)
 	mux.Post("/api/v1/file-upload/{file}", s.handleFileUpload)
 
@@ -174,26 +175,32 @@ func (s *Server) handleNewEvent(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 }
 
-func (s *Server) handleGetEvents(w http.ResponseWriter, r *http.Request) {
+func (s *Server) writeEventsAsText(w http.ResponseWriter) {
 	s.eventsLock.RLock()
 	defer s.eventsLock.RUnlock()
 
+	w.Header().Set("Content-Type", "text/plain")
+	for _, event := range s.events {
+		_, err := w.Write([]byte(event.ReceivedAt.Format(time.RFC3339) + " \t " + event.Message + "\n"))
+		if err != nil {
+			s.log.Error("Failed to write event", "err", err)
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+	}
+}
+
+func (s *Server) handleGetEvents(w http.ResponseWriter, r *http.Request) {
 	// respond either as JSON or plain text
 	if r.URL.Query().Get("format") == "text" {
 		// write events as plain text response
-		w.Header().Set("Content-Type", "text/plain")
-		for _, event := range s.events {
-			_, err := w.Write([]byte(event.ReceivedAt.Format(time.RFC3339) + " \t " + event.Message + "\n"))
-			if err != nil {
-				s.log.Error("Failed to write event", "err", err)
-				w.WriteHeader(http.StatusInternalServerError)
-				return
-			}
-		}
+		s.writeEventsAsText(w)
 		return
 	}
 
 	// write events as JSON response
+	s.eventsLock.RLock()
+	defer s.eventsLock.RUnlock()
 	w.Header().Set("Content-Type", "application/json")
 	err := json.NewEncoder(w).Encode(s.events)
 	if err != nil {
@@ -201,6 +208,10 @@ func (s *Server) handleGetEvents(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
+}
+
+func (s *Server) handleGetLogs(w http.ResponseWriter, r *http.Request) {
+	s.writeEventsAsText(w)
 }
 
 func (s *Server) handleAction(w http.ResponseWriter, r *http.Request) {

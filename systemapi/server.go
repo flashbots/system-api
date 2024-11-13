@@ -45,6 +45,8 @@ type Server struct {
 
 	events     []Event
 	eventsLock sync.RWMutex
+
+	basicAuthSecret string
 }
 
 func NewServer(cfg *HTTPServerConfig) (srv *Server, err error) {
@@ -53,6 +55,26 @@ func NewServer(cfg *HTTPServerConfig) (srv *Server, err error) {
 		log:    cfg.Log,
 		srv:    nil,
 		events: make([]Event, 0),
+	}
+
+	if cfg.Config.General.BasicAuthSecretPath != "" {
+		// Abort if the file does not exist
+		if _, err := os.Stat(cfg.Config.General.BasicAuthSecretPath); os.IsNotExist(err) {
+			return nil, fmt.Errorf("basic auth secret file does not exist: %s", cfg.Config.General.BasicAuthSecretPath)
+		}
+
+		// Read the secret from the file
+		secret, err := os.ReadFile(cfg.Config.General.BasicAuthSecretPath)
+		if err != nil {
+			return nil, fmt.Errorf("failed to read basic auth secret file: %w", err)
+		}
+
+		if len(secret) == 0 {
+			cfg.Log.Info("Empty basic auth file loaded", "file", cfg.Config.General.BasicAuthSecretPath)
+		} else {
+			cfg.Log.Info("Basic auth enabled", "file", cfg.Config.General.BasicAuthSecretPath)
+		}
+		srv.basicAuthSecret = string(secret)
 	}
 
 	if cfg.Config.General.PipeFile != "" {
@@ -80,12 +102,16 @@ func (s *Server) getRouter() http.Handler {
 
 	mux.Use(httplog.RequestLogger(s.log))
 	mux.Use(middleware.Recoverer)
+	mux.Use(BasicAuth("system-api", s.getBasicAuthCreds))
 
 	mux.Get("/", s.handleLivenessCheck)
 	mux.Get("/livez", s.handleLivenessCheck)
 	mux.Get("/api/v1/new_event", s.handleNewEvent)
 	mux.Get("/api/v1/events", s.handleGetEvents)
 	mux.Get("/logs", s.handleGetLogs)
+
+	mux.Post("/api/v1/set-basic-auth", s.handleSetBasicAuthCreds)
+
 	mux.Get("/api/v1/actions/{action}", s.handleAction)
 	mux.Post("/api/v1/file-upload/{file}", s.handleFileUpload)
 
@@ -283,5 +309,42 @@ func (s *Server) handleFileUpload(w http.ResponseWriter, r *http.Request) {
 
 	log.Info("File uploaded")
 	s.addInternalEvent(fmt.Sprintf("file upload success: %s = %s - content: %d bytes", fileArg, filename, len(content)))
+	w.WriteHeader(http.StatusOK)
+}
+
+func (s *Server) getBasicAuthCreds() map[string]string {
+	// dynamic because can be set at runtime
+	resp := make(map[string]string)
+	if s.basicAuthSecret != "" {
+		resp["admin"] = s.basicAuthSecret
+	}
+	return resp
+}
+
+func (s *Server) handleSetBasicAuthCreds(w http.ResponseWriter, r *http.Request) {
+	if s.cfg.Config.General.BasicAuthSecretPath == "" {
+		s.log.Warn("Basic auth secret path not set")
+		w.WriteHeader(http.StatusNotImplemented)
+		return
+	}
+
+	// read secret from payload
+	secret, err := io.ReadAll(r.Body)
+	if err != nil {
+		s.log.Error("Failed to read secret from payload", "err", err)
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	// write secret to file
+	err = os.WriteFile(s.cfg.Config.General.BasicAuthSecretPath, secret, 0o600)
+	if err != nil {
+		s.log.Error("Failed to write secret to file", "err", err)
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	s.basicAuthSecret = string(secret)
+	s.log.Info("Basic auth secret updated")
 	w.WriteHeader(http.StatusOK)
 }

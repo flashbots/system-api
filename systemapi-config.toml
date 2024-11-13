@@ -4,6 +4,9 @@ pipe_file = "pipe.fifo"
 log_json = false
 log_debug = true
 
+# The path to the secret file used for basic auth
+basic_auth_secret_path = "/tmp/basic_auth_secret"
+
 [actions]
 # reboot = "reboot"
 # rbuilder_restart = "/etc/init.d/rbuilder restart"

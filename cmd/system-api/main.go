@@ -97,6 +97,7 @@ func runCli(cCtx *cli.Context) (err error) {
 	}
 	server, err := systemapi.NewServer(cfg)
 	if err != nil {
+		log.Error("Error creating server", "err", err)
 		return err
 	}
 	go server.Start()

@@ -11,6 +11,8 @@ type systemAPIConfigGeneral struct {
 	PipeFile   string `toml:"pipe_file"`
 	LogJSON    bool   `toml:"log_json"`
 	LogDebug   bool   `toml:"log_debug"`
+
+	BasicAuthSecretPath string `toml:"basic_auth_secret_path"`
 }
 
 type SystemAPIConfig struct {

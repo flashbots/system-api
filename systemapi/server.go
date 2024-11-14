@@ -23,25 +23,14 @@ import (
 	"github.com/go-chi/httplog/v2"
 )
 
-type HTTPServerConfig struct {
-	Config *SystemAPIConfig
-	Log    *httplog.Logger
-
-	DrainDuration            time.Duration
-	GracefulShutdownDuration time.Duration
-	ReadTimeout              time.Duration
-	WriteTimeout             time.Duration
-}
-
 type Event struct {
 	ReceivedAt time.Time `json:"received_at"`
 	Message    string    `json:"message"`
 }
 
 type Server struct {
-	cfg *HTTPServerConfig
+	cfg *SystemAPIConfig
 	log *httplog.Logger
-
 	srv *http.Server
 
 	events     []Event
@@ -50,70 +39,70 @@ type Server struct {
 	basicAuthHash string
 }
 
-func NewServer(cfg *HTTPServerConfig) (srv *Server, err error) {
-	srv = &Server{
+func NewServer(log *httplog.Logger, cfg *SystemAPIConfig) (server *Server, err error) {
+	server = &Server{
 		cfg:    cfg,
-		log:    cfg.Log,
+		log:    log,
 		srv:    nil,
 		events: make([]Event, 0),
 	}
 
 	// Load (or create) file with basic auth secret hash
-	err = srv.loadBasicAuthSecretFromFile()
+	err = server.loadBasicAuthSecretFromFile()
 	if err != nil {
 		return nil, err
 	}
 
 	// Setup the pipe file
-	if cfg.Config.General.PipeFile != "" {
-		os.Remove(cfg.Config.General.PipeFile)
-		err := syscall.Mknod(cfg.Config.General.PipeFile, syscall.S_IFIFO|0o666, 0)
+	if cfg.General.PipeFile != "" {
+		os.Remove(cfg.General.PipeFile)
+		err := syscall.Mknod(cfg.General.PipeFile, syscall.S_IFIFO|0o666, 0)
 		if err != nil {
 			return nil, err
 		}
 
-		go srv.readPipeInBackground()
+		go server.readPipeInBackground()
 	}
 
 	// Create the HTTP server
-	srv.srv = &http.Server{
-		Addr:         cfg.Config.General.ListenAddr,
-		Handler:      srv.getRouter(),
-		ReadTimeout:  cfg.ReadTimeout,
-		WriteTimeout: cfg.WriteTimeout,
+	server.srv = &http.Server{
+		Addr:         cfg.General.ListenAddr,
+		Handler:      server.getRouter(),
+		ReadTimeout:  time.Duration(cfg.General.HTTPReadTimeoutMillis) * time.Millisecond,
+		WriteTimeout: time.Duration(cfg.General.HTTPWriteTimeoutMillis) * time.Millisecond,
 	}
 
-	return srv, nil
+	return server, nil
 }
 
 func (s *Server) loadBasicAuthSecretFromFile() error {
-	if s.cfg.Config.General.BasicAuthSecretPath == "" {
+	if s.cfg.General.BasicAuthSecretPath == "" {
 		return nil
 	}
 
 	// Create if the file does not exist
-	if _, err := os.Stat(s.cfg.Config.General.BasicAuthSecretPath); os.IsNotExist(err) {
-		err = os.WriteFile(s.cfg.Config.General.BasicAuthSecretPath, []byte{}, 0o600)
+	if _, err := os.Stat(s.cfg.General.BasicAuthSecretPath); os.IsNotExist(err) {
+		err = os.WriteFile(s.cfg.General.BasicAuthSecretPath, []byte{}, 0o600)
 		if err != nil {
 			return fmt.Errorf("failed to create basic auth secret file: %w", err)
 		}
-		s.cfg.Log.Info("Basic auth file created, auth disabled until secret is configured", "file", s.cfg.Config.General.BasicAuthSecretPath)
+		s.log.Info("Basic auth file created, auth disabled until secret is configured", "file", s.cfg.General.BasicAuthSecretPath)
 		s.basicAuthHash = ""
 		return nil
 	}
 
 	// Read the secret from the file
-	secret, err := os.ReadFile(s.cfg.Config.General.BasicAuthSecretPath)
+	secret, err := os.ReadFile(s.cfg.General.BasicAuthSecretPath)
 	if err != nil {
 		return fmt.Errorf("failed to read basic auth secret file: %w", err)
 	}
 
-	if len(secret) == 0 {
-		s.cfg.Log.Info("Basic auth file without secret loaded, auth disabled until secret is configured", "file", s.cfg.Config.General.BasicAuthSecretPath)
-	} else {
-		s.cfg.Log.Info("Basic auth enabled", "file", s.cfg.Config.General.BasicAuthSecretPath)
-	}
 	s.basicAuthHash = string(secret)
+	if len(secret) == 0 {
+		s.log.Info("Basic auth file without secret loaded, auth disabled until secret is configured", "file", s.cfg.General.BasicAuthSecretPath)
+	} else {
+		s.log.Info("Basic auth enabled", "file", s.cfg.General.BasicAuthSecretPath)
+	}
 	return nil
 }
 
@@ -124,7 +113,7 @@ func (s *Server) getRouter() http.Handler {
 	mux.Use(middleware.Recoverer)
 
 	// Enable a custom HTTP Basic Auth middleware
-	mux.Use(BasicAuth("system-api", s.getBasicAuthHashedCredentials))
+	mux.Use(BasicAuth("system-api", s.cfg.General.BasicAuthSecretSalt, s.getBasicAuthHashedCredentials))
 
 	// Common APIs
 	mux.Get("/", s.handleLivenessCheck)
@@ -145,7 +134,7 @@ func (s *Server) getRouter() http.Handler {
 	mux.Post("/api/v1/file-upload/{file}", s.handleFileUpload)
 
 	// Optionally, pprof
-	if s.cfg.Config.General.EnablePprof {
+	if s.cfg.General.EnablePprof {
 		mux.Mount("/debug", middleware.Profiler())
 		s.log.Info("pprof API enabled: /debug/pprof/")
 	}
@@ -154,7 +143,7 @@ func (s *Server) getRouter() http.Handler {
 }
 
 func (s *Server) readPipeInBackground() {
-	file, err := os.OpenFile(s.cfg.Config.General.PipeFile, os.O_CREATE, os.ModeNamedPipe)
+	file, err := os.OpenFile(s.cfg.General.PipeFile, os.O_CREATE, os.ModeNamedPipe)
 	if err != nil {
 		s.log.Error("Open named pipe file error:", "error", err)
 		return
@@ -176,7 +165,7 @@ func (s *Server) readPipeInBackground() {
 }
 
 func (s *Server) Start() {
-	s.log.Info("Starting HTTP server", "listenAddress", s.cfg.Config.General.ListenAddr)
+	s.log.Info("Starting HTTP server", "listenAddress", s.cfg.General.ListenAddr)
 	if err := s.srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 		s.log.Error("HTTP server failed", "err", err)
 	}
@@ -189,8 +178,8 @@ func (s *Server) Shutdown(ctx context.Context) error {
 		s.log.Error("HTTP server shutdown failed", "err", err)
 	}
 
-	if s.cfg.Config.General.PipeFile != "" {
-		os.Remove(s.cfg.Config.General.PipeFile)
+	if s.cfg.General.PipeFile != "" {
+		os.Remove(s.cfg.General.PipeFile)
 	}
 
 	s.log.Info("HTTP server shutdown")
@@ -273,12 +262,12 @@ func (s *Server) handleAction(w http.ResponseWriter, r *http.Request) {
 	action := chi.URLParam(r, "action")
 	s.log.Info("Received action", "action", action)
 
-	if s.cfg.Config == nil {
+	if s.cfg == nil {
 		w.WriteHeader(http.StatusNotImplemented)
 		return
 	}
 
-	cmd, ok := s.cfg.Config.Actions[action]
+	cmd, ok := s.cfg.Actions[action]
 	if !ok {
 		w.WriteHeader(http.StatusBadRequest)
 		return
@@ -305,12 +294,12 @@ func (s *Server) handleFileUpload(w http.ResponseWriter, r *http.Request) {
 	log := s.log.With("file", fileArg)
 	log.Info("Receiving file upload")
 
-	if s.cfg.Config == nil {
+	if s.cfg == nil {
 		w.WriteHeader(http.StatusNotImplemented)
 		return
 	}
 
-	filename, ok := s.cfg.Config.FileUploads[fileArg]
+	filename, ok := s.cfg.FileUploads[fileArg]
 	if !ok {
 		w.WriteHeader(http.StatusBadRequest)
 		return
@@ -354,7 +343,7 @@ func (s *Server) getBasicAuthHashedCredentials() map[string]string {
 }
 
 func (s *Server) handleSetBasicAuthCreds(w http.ResponseWriter, r *http.Request) {
-	if s.cfg.Config.General.BasicAuthSecretPath == "" {
+	if s.cfg.General.BasicAuthSecretPath == "" {
 		s.log.Warn("Basic auth secret path not set")
 		w.WriteHeader(http.StatusNotImplemented)
 		return
@@ -371,10 +360,11 @@ func (s *Server) handleSetBasicAuthCreds(w http.ResponseWriter, r *http.Request)
 	// Create hash of the secret
 	h := sha256.New()
 	h.Write(secret)
+	h.Write([]byte(s.cfg.General.BasicAuthSecretSalt))
 	secretHash := hex.EncodeToString(h.Sum(nil))
 
 	// write secret to file
-	err = os.WriteFile(s.cfg.Config.General.BasicAuthSecretPath, []byte(secretHash), 0o600)
+	err = os.WriteFile(s.cfg.General.BasicAuthSecretPath, []byte(secretHash), 0o600)
 	if err != nil {
 		s.log.Error("Failed to write secret to file", "err", err)
 		w.WriteHeader(http.StatusInternalServerError)

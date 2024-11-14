@@ -14,6 +14,10 @@ type systemAPIConfigGeneral struct {
 	EnablePprof bool   `toml:"pprof"` // Enables pprof endpoints
 
 	BasicAuthSecretPath string `toml:"basic_auth_secret_path"`
+	BasicAuthSecretSalt string `toml:"basic_auth_secret_salt"`
+
+	HTTPReadTimeoutMillis  int `toml:"http_read_timeout_ms"`
+	HTTPWriteTimeoutMillis int `toml:"http_write_timeout_ms"`
 }
 
 type SystemAPIConfig struct {

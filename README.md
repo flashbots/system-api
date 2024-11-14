@@ -97,7 +97,7 @@ $ curl -v -X POST -d "@README.md" localhost:3535/api/v1/file-upload/testfile
 All API endpoints can be protected with HTTP Basic Auth.
 
 The API endpoints are initially unauthenticated, until a secret is configured
-either via file or via API. If the secret is configured via API, the SHA256
+either via file or via API. If the secret is configured via API, the salted SHA256
 hash is be stored in a file (specified in the config file) to enable basic auth protection
 across restarts.
 

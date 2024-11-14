@@ -22,11 +22,11 @@ func getTestLogger() *httplog.Logger {
 	})
 }
 
-func getTestConfig() *HTTPServerConfig {
-	return &HTTPServerConfig{
-		Log:    getTestLogger(),
-		Config: NewSystemAPIConfig(),
-	}
+func newTestServer(t *testing.T) *Server {
+	t.Helper()
+	srv, err := NewServer(getTestLogger(), NewSystemAPIConfig())
+	require.NoError(t, err)
+	return srv
 }
 
 // Helper to execute an API request with optional basic auth
@@ -61,8 +61,7 @@ func createRequestRunner(t *testing.T, router http.Handler, method, url string) 
 
 func TestGeneralHandlers(t *testing.T) {
 	// Instantiate the server
-	srv, err := NewServer(getTestConfig())
-	require.NoError(t, err)
+	srv := newTestServer(t)
 	router := srv.getRouter()
 
 	// Test /livez
@@ -94,31 +93,28 @@ func TestGeneralHandlers(t *testing.T) {
 func TestBasicAuth(t *testing.T) {
 	tempDir := t.TempDir()
 	basicAuthSecret := []byte("secret")
+	basicAuthSalt := "salt"
 
 	// Create a hash of the basic auth secret
 	h := sha256.New()
 	h.Write(basicAuthSecret)
+	h.Write([]byte(basicAuthSalt))
 	basicAuthSecretHash := hex.EncodeToString(h.Sum(nil))
 
 	// Create the config
-	cfg := getTestConfig()
-	cfg.Config.General.BasicAuthSecretPath = tempDir + "/basic_auth_secret"
+	cfg := NewSystemAPIConfig()
+	cfg.General.BasicAuthSecretPath = tempDir + "/basic_auth_secret"
+	cfg.General.BasicAuthSecretSalt = basicAuthSalt
 
 	// Create the server instance
-	_, err := NewServer(cfg)
+	srv, err := NewServer(getTestLogger(), cfg)
 	require.NoError(t, err)
 
 	// Ensure the basic auth secret file was created
-	_, err = os.Stat(cfg.Config.General.BasicAuthSecretPath)
+	_, err = os.Stat(cfg.General.BasicAuthSecretPath)
 	require.NoError(t, err)
 
-	// Create the temporary file to store the basic auth secret
-	err = os.WriteFile(cfg.Config.General.BasicAuthSecretPath, []byte{}, 0o600)
-	require.NoError(t, err)
-
-	// Server will work now
-	srv, err := NewServer(cfg)
-	require.NoError(t, err)
+	// Get the router
 	router := srv.getRouter()
 
 	// Prepare request helpers
@@ -138,7 +134,7 @@ func TestBasicAuth(t *testing.T) {
 	require.Equal(t, http.StatusOK, code)
 
 	// Ensure hash was written to file and is reproducible
-	secretFromFile, err := os.ReadFile(cfg.Config.General.BasicAuthSecretPath)
+	secretFromFile, err := os.ReadFile(cfg.General.BasicAuthSecretPath)
 	require.NoError(t, err)
 	require.Equal(t, basicAuthSecretHash, string(secretFromFile))
 

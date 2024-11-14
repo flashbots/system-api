@@ -9,7 +9,7 @@ import (
 )
 
 // BasicAuth implements a simple middleware handler for adding basic http auth to a route.
-func BasicAuth(realm string, getHashedCredentials func() map[string]string) func(next http.Handler) http.Handler {
+func BasicAuth(realm, salt string, getHashedCredentials func() map[string]string) func(next http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			// Loading credentials dynamically because they can be updated at runtime
@@ -31,6 +31,7 @@ func BasicAuth(realm string, getHashedCredentials func() map[string]string) func
 			// Hash the password and see if credentials are allowed
 			h := sha256.New()
 			h.Write([]byte(pass))
+			h.Write([]byte(salt))
 			userPassHash := hex.EncodeToString(h.Sum(nil))
 
 			// Compare to allowed credentials

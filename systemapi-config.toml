@@ -1,3 +1,9 @@
+[general]
+listen_addr = "0.0.0.0:3535"
+pipe_file = "pipe.fifo"
+log_json = false
+log_debug = true
+
 [actions]
 # reboot = "reboot"
 # rbuilder_restart = "/etc/init.d/rbuilder restart"

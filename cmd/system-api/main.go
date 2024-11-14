@@ -47,11 +47,12 @@ func main() {
 }
 
 func runCli(cCtx *cli.Context) (err error) {
+	// Load cli arguments
 	configFile := cCtx.String("config")
 	listenAddr := cCtx.String("listen-addr")
 	pipeFile := cCtx.String("pipe-file")
 
-	// Load configuration file
+	// Create configuration file (load from file if requested)
 	config := systemapi.NewSystemAPIConfig()
 	if configFile != "" {
 		config, err = systemapi.LoadConfigFromFile(configFile)
@@ -61,7 +62,7 @@ func runCli(cCtx *cli.Context) (err error) {
 		}
 	}
 
-	// Override unset cli flags with config file values
+	// Override configuration with cli arguments, if present
 	if listenAddr == "" {
 		config.General.ListenAddr = listenAddr
 	}
@@ -73,7 +74,6 @@ func runCli(cCtx *cli.Context) (err error) {
 	logTags := map[string]string{
 		"version": common.Version,
 	}
-
 	log := common.SetupLogger(&common.LoggingOpts{
 		JSON:           config.General.LogJSON,
 		Debug:          config.General.LogDebug,

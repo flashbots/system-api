@@ -36,7 +36,7 @@ curl -v localhost:3535/api/v1/actions/echo_test
 curl -v -X POST -d "@README.md" localhost:3535/api/v1/file-upload/testfile
 
 # get event log
-curl localhost:3535/api/v1/events?format=text
+curl localhost:3535/logs
 2024-11-05T22:03:23Z     hello world
 2024-11-05T22:03:26Z     this is a test
 2024-11-05T22:03:29Z     [system-api] executing action: echo_test = echo test
@@ -60,7 +60,7 @@ $ echo "hello world" > pipe.fifo
 $ curl localhost:3535/api/v1/new_event?message=this+is+a+test
 
 # Query events (plain text or JSON is supported)
-$ curl localhost:3535/api/v1/events?format=text
+$ curl localhost:3535/logs
 2024-10-23T12:04:01Z     hello world
 2024-10-23T12:04:07Z     this is a test
 ```

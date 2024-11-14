@@ -13,6 +13,7 @@ It currently does the following things:
 - **Actions**: Ability to execute shell commands via API
 - **Configuration** through file uploads
 - **HTTP Basic Auth** for API endpoints
+- All actions show up in the event log
 
 ---
 
@@ -101,24 +102,32 @@ hash is be stored in a file (specified in the config file) to enable basic auth 
 across restarts.
 
 The config file ([systemapi-config.toml](./systemapi-config.toml)) includes a `basic_auth_secret_path`.
-- If this file is specified but doesn't exist, system-api will not start and log an error.
-- If the file exists and is empty, then the APIs are unauthenticated until a secret is configured.
 - If the file exists and is not empty, then the APIs are authenticated for passwords that match the hash in this file.
+- If the file exists and is empty, then the APIs are unauthenticated until a secret is configured.
+- If this file is specified but doesn't exist, system-api will create it (empty).
 
 ```bash
-# Set `basic_auth_secret_path` in the config file and create it empty
-touch .basic-auth-secret
-vi systemapi-config.toml
+# The included systemapi-config.toml uses basic-auth-secret.txt for basic_auth_secret_path
+cat systemapi-config.toml
 
-# Start the server,
-$ go run cmd/system-api/main.go --config systemapi-config.toml
+# Start the server
+go run cmd/system-api/main.go --config systemapi-config.toml
 
 # Initially, requests are unauthenticated
-$ curl localhost:3535/livez
+curl -v localhost:3535/livez
 
-# Set the basic auth secret
-$ curl -d "foobar" localhost:3535/api/v1/set-basic-auth
+# Set the basic auth secret. From here on, authentication is required for all API requests.
+curl -d "foobar" localhost:3535/api/v1/set-basic-auth
 
-# Now requests are authenticated
-$ curl -u admin:foobar -v localhost:3535/livez
+# Check that hash was written to the file
+cat basic-auth-secret.txt
+
+# API calls with no basic auth credentials are provided fail now, with '401 Unauthorized' because
+curl -v localhost:3535/livez
+
+# API calls work if correct basic auth credentials are provided
+curl -v -u admin:foobar localhost:3535/livez
+
+# The update also shows up in the logs
+curl -u admin:foobar localhost:3535/logs
 ```

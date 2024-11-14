@@ -51,8 +51,8 @@ func execRequest(t *testing.T, router http.Handler, method, url string, requestB
 	return execRequestAuth(t, router, method, url, requestBody, "", "")
 }
 
-// Helper to create prepared executors for specific API endpoints
-func makeRequestExecutor(t *testing.T, router http.Handler, method, url string) func(basicAuthUser, basicAuthPass string, requestBody io.Reader) (statusCode int, responsePayload []byte) {
+// Helper to create prepared test runners for specific API endpoints
+func createRequestRunner(t *testing.T, router http.Handler, method, url string) func(basicAuthUser, basicAuthPass string, requestBody io.Reader) (statusCode int, responsePayload []byte) {
 	t.Helper()
 	return func(basicAuthUser, basicAuthPass string, requestBody io.Reader) (statusCode int, responsePayload []byte) {
 		return execRequestAuth(t, router, method, url, requestBody, basicAuthUser, basicAuthPass)
@@ -69,7 +69,7 @@ func TestGeneralHandlers(t *testing.T) {
 	code, _ := execRequest(t, router, http.MethodGet, "/livez", nil)
 	require.Equal(t, http.StatusOK, code)
 
-	// Test /api/v1/events
+	// /api/v1/events is initially empty
 	code, respBody := execRequest(t, router, http.MethodGet, "/api/v1/events", nil)
 	require.Equal(t, http.StatusOK, code)
 	require.Equal(t, "[]\n", string(respBody))
@@ -78,6 +78,17 @@ func TestGeneralHandlers(t *testing.T) {
 	code, _ = execRequest(t, router, http.MethodGet, "/api/v1/new_event?message=foo", nil)
 	require.Equal(t, http.StatusOK, code)
 	require.Len(t, srv.events, 1)
+	require.Equal(t, "foo", srv.events[0].Message)
+
+	// /api/v1/events now has an entry
+	code, respBody = execRequest(t, router, http.MethodGet, "/api/v1/events", nil)
+	require.Equal(t, http.StatusOK, code)
+	require.Contains(t, string(respBody), "foo")
+
+	// /logs should also work
+	code, respBody = execRequest(t, router, http.MethodGet, "/logs", nil)
+	require.Equal(t, http.StatusOK, code)
+	require.Contains(t, string(respBody), "foo\n")
 }
 
 func TestBasicAuth(t *testing.T) {
@@ -93,9 +104,13 @@ func TestBasicAuth(t *testing.T) {
 	cfg := getTestConfig()
 	cfg.Config.General.BasicAuthSecretPath = tempDir + "/basic_auth_secret"
 
-	// Server should fail to start if the basic auth secret file does not exist
+	// Create the server instance
 	_, err := NewServer(cfg)
-	require.Error(t, err)
+	require.NoError(t, err)
+
+	// Ensure the basic auth secret file was created
+	_, err = os.Stat(cfg.Config.General.BasicAuthSecretPath)
+	require.NoError(t, err)
 
 	// Create the temporary file to store the basic auth secret
 	err = os.WriteFile(cfg.Config.General.BasicAuthSecretPath, []byte{}, 0o600)
@@ -107,8 +122,8 @@ func TestBasicAuth(t *testing.T) {
 	router := srv.getRouter()
 
 	// Prepare request helpers
-	reqGetLiveZ := makeRequestExecutor(t, router, http.MethodGet, "/livez")
-	reqSetBasicAuthSecret := makeRequestExecutor(t, router, http.MethodPost, "/api/v1/set-basic-auth")
+	reqGetLiveZ := createRequestRunner(t, router, http.MethodGet, "/livez")
+	reqSetBasicAuthSecret := createRequestRunner(t, router, http.MethodPost, "/api/v1/set-basic-auth")
 
 	// Initially, /livez should work without basic auth
 	code, _ := reqGetLiveZ("", "", nil)

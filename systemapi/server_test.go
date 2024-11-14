@@ -2,6 +2,8 @@ package systemapi
 
 import (
 	"bytes"
+	"crypto/sha256"
+	"encoding/hex"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -79,8 +81,13 @@ func TestGeneralHandlers(t *testing.T) {
 }
 
 func TestBasicAuth(t *testing.T) {
-	basicAuthSecret := []byte("secret")
 	tempDir := t.TempDir()
+	basicAuthSecret := []byte("secret")
+
+	// Create a hash of the basic auth secret
+	h := sha256.New()
+	h.Write(basicAuthSecret)
+	basicAuthSecretHash := hex.EncodeToString(h.Sum(nil))
 
 	// Create the config
 	cfg := getTestConfig()
@@ -115,10 +122,10 @@ func TestBasicAuth(t *testing.T) {
 	code, _ = reqSetBasicAuthSecret("", "", bytes.NewReader(basicAuthSecret))
 	require.Equal(t, http.StatusOK, code)
 
-	// Ensure secretFromFile was written to file
+	// Ensure hash was written to file and is reproducible
 	secretFromFile, err := os.ReadFile(cfg.Config.General.BasicAuthSecretPath)
 	require.NoError(t, err)
-	require.Equal(t, basicAuthSecret, secretFromFile)
+	require.Equal(t, basicAuthSecretHash, string(secretFromFile))
 
 	// From here on, /livez shoud fail without basic auth
 	code, _ = reqGetLiveZ("", "", nil)

@@ -93,13 +93,17 @@ $ curl -v -X POST -d "@README.md" localhost:3535/api/v1/file-upload/testfile
 
 ## HTTP Basic Auth
 
-All API endpoints can be protected with HTTP Basic Auth. The secret needs to be set once, either via file or via API.
-If set via API, it will be persisted in a file specified in the config file.
+All API endpoints can be protected with HTTP Basic Auth.
+
+The API endpoints are initially unauthenticated, until a secret is configured
+either via file or via API. If the secret is configured via API, the SHA256
+hash is be stored in a file (specified in the config file) to enable basic auth protection
+across restarts.
 
 The config file ([systemapi-config.toml](./systemapi-config.toml)) includes a `basic_auth_secret_path`.
-- If this file is specified but doesn't exist, system-api will not start
-- If the file exists and is empty, then the APIs are unauthenticated until a secret is set
-- If the file exists and is not empty, then the APIs are authenticated with the secret in this file
+- If this file is specified but doesn't exist, system-api will not start and log an error.
+- If the file exists and is empty, then the APIs are unauthenticated until a secret is configured.
+- If the file exists and is not empty, then the APIs are authenticated for passwords that match the hash in this file.
 
 ```bash
 # Set `basic_auth_secret_path` in the config file and create it empty
@@ -110,7 +114,7 @@ vi systemapi-config.toml
 $ go run cmd/system-api/main.go --config systemapi-config.toml
 
 # Initially, requests are unauthenticated
-$ curl localhost:3535/api/v1/livez
+$ curl localhost:3535/livez
 
 # Set the basic auth secret
 $ curl -d "foobar" localhost:3535/api/v1/set-basic-auth

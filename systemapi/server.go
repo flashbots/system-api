@@ -4,6 +4,8 @@ package systemapi
 import (
 	"bufio"
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -46,7 +48,7 @@ type Server struct {
 	events     []Event
 	eventsLock sync.RWMutex
 
-	basicAuthSecret string
+	basicAuthHash string
 }
 
 func NewServer(cfg *HTTPServerConfig) (srv *Server, err error) {
@@ -70,11 +72,11 @@ func NewServer(cfg *HTTPServerConfig) (srv *Server, err error) {
 		}
 
 		if len(secret) == 0 {
-			cfg.Log.Info("Empty basic auth file loaded", "file", cfg.Config.General.BasicAuthSecretPath)
+			cfg.Log.Info("Basic auth file without secret loaded, auth disabled until secret is configured", "file", cfg.Config.General.BasicAuthSecretPath)
 		} else {
 			cfg.Log.Info("Basic auth enabled", "file", cfg.Config.General.BasicAuthSecretPath)
 		}
-		srv.basicAuthSecret = string(secret)
+		srv.basicAuthHash = string(secret)
 	}
 
 	if cfg.Config.General.PipeFile != "" {
@@ -102,7 +104,7 @@ func (s *Server) getRouter() http.Handler {
 
 	mux.Use(httplog.RequestLogger(s.log))
 	mux.Use(middleware.Recoverer)
-	mux.Use(BasicAuth("system-api", s.getBasicAuthCreds))
+	mux.Use(BasicAuth("system-api", s.getBasicAuthHashedCredentials))
 
 	mux.Get("/", s.handleLivenessCheck)
 	mux.Get("/livez", s.handleLivenessCheck)
@@ -312,13 +314,13 @@ func (s *Server) handleFileUpload(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 }
 
-func (s *Server) getBasicAuthCreds() map[string]string {
+func (s *Server) getBasicAuthHashedCredentials() map[string]string {
 	// dynamic because can be set at runtime
-	resp := make(map[string]string)
-	if s.basicAuthSecret != "" {
-		resp["admin"] = s.basicAuthSecret
+	hashedCredentials := make(map[string]string)
+	if s.basicAuthHash != "" {
+		hashedCredentials["admin"] = s.basicAuthHash
 	}
-	return resp
+	return hashedCredentials
 }
 
 func (s *Server) handleSetBasicAuthCreds(w http.ResponseWriter, r *http.Request) {
@@ -336,15 +338,20 @@ func (s *Server) handleSetBasicAuthCreds(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
+	// Create hash of the secret
+	h := sha256.New()
+	h.Write(secret)
+	secretHash := hex.EncodeToString(h.Sum(nil))
+
 	// write secret to file
-	err = os.WriteFile(s.cfg.Config.General.BasicAuthSecretPath, secret, 0o600)
+	err = os.WriteFile(s.cfg.Config.General.BasicAuthSecretPath, []byte(secretHash), 0o600)
 	if err != nil {
 		s.log.Error("Failed to write secret to file", "err", err)
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
 
-	s.basicAuthSecret = string(secret)
+	s.basicAuthHash = secretHash
 	s.log.Info("Basic auth secret updated")
 	w.WriteHeader(http.StatusOK)
 }

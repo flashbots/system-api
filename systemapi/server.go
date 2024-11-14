@@ -98,6 +98,10 @@ func (s *Server) loadBasicAuthSecretFromFile() error {
 	}
 
 	s.basicAuthHash = string(secret)
+	if len(s.basicAuthHash) != 64 {
+		return fmt.Errorf("basic auth secret in %s does not look like a SHA256 hash (must be 64 characters)", s.cfg.General.BasicAuthSecretPath)
+	}
+
 	if len(secret) == 0 {
 		s.log.Info("Basic auth file without secret loaded, auth disabled until secret is configured", "file", s.cfg.General.BasicAuthSecretPath)
 	} else {

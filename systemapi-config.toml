@@ -1,14 +1,23 @@
 [general]
 listen_addr = "0.0.0.0:3535"
 pipe_file = "pipe.fifo"
+pprof = true
 log_json = false
 log_debug = true
 
+# HTTP Basic Auth
+basic_auth_secret_path = "basic-auth-secret.txt" # basic auth is supported if a path is provided
+basic_auth_secret_salt = "D;%yL9TS:5PalS/d"      # use a random string for the salt
+
+# HTTP server timeouts
+# http_read_timeout_ms = 2500
+# http_write_timeout_ms = 2500
+
 [actions]
+echo_test = "echo test"
 # reboot = "reboot"
 # rbuilder_restart = "/etc/init.d/rbuilder restart"
 # rbuilder_stop = "/etc/init.d/rbuilder stop"
-echo_test = "echo test"
 
 [file_uploads]
 testfile = "/tmp/testfile.txt"

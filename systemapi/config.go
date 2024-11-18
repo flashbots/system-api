@@ -7,10 +7,17 @@ import (
 )
 
 type systemAPIConfigGeneral struct {
-	ListenAddr string `toml:"listen_addr"`
-	PipeFile   string `toml:"pipe_file"`
-	LogJSON    bool   `toml:"log_json"`
-	LogDebug   bool   `toml:"log_debug"`
+	ListenAddr  string `toml:"listen_addr"`
+	PipeFile    string `toml:"pipe_file"`
+	LogJSON     bool   `toml:"log_json"`
+	LogDebug    bool   `toml:"log_debug"`
+	EnablePprof bool   `toml:"pprof"` // Enables pprof endpoints
+
+	BasicAuthSecretPath string `toml:"basic_auth_secret_path"`
+	BasicAuthSecretSalt string `toml:"basic_auth_secret_salt"`
+
+	HTTPReadTimeoutMillis  int `toml:"http_read_timeout_ms"`
+	HTTPWriteTimeoutMillis int `toml:"http_write_timeout_ms"`
 }
 
 type SystemAPIConfig struct {

@@ -22,3 +22,4 @@
 /cert.pem
 /key.pem
 /pipe.fifo
+/basic-auth-secret.txt

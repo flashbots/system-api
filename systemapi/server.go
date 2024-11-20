@@ -206,7 +206,7 @@ func (s *Server) addEvent(event Event) {
 	// Add event to the list and prune if necessary
 	s.eventsLock.Lock()
 	s.events = append(s.events, event)
-	if len(s.events) > MaxEvents {
+	if len(s.events) > s.cfg.General.LogMaxEntries {
 		s.events = s.events[1:]
 	}
 	s.eventsLock.Unlock()

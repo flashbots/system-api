@@ -7,11 +7,12 @@ import (
 )
 
 type systemAPIConfigGeneral struct {
-	ListenAddr  string `toml:"listen_addr"`
-	PipeFile    string `toml:"pipe_file"`
-	LogJSON     bool   `toml:"log_json"`
-	LogDebug    bool   `toml:"log_debug"`
-	EnablePprof bool   `toml:"pprof"` // Enables pprof endpoints
+	ListenAddr    string `toml:"listen_addr"`
+	PipeFile      string `toml:"pipe_file"`
+	LogJSON       bool   `toml:"log_json"`
+	LogDebug      bool   `toml:"log_debug"`
+	EnablePprof   bool   `toml:"pprof"`           // Enables pprof endpoints
+	LogMaxEntries int    `toml:"log_max_entries"` // Maximum number of log entries
 
 	BasicAuthSecretPath string `toml:"basic_auth_secret_path"`
 	BasicAuthSecretSalt string `toml:"basic_auth_secret_salt"`
@@ -41,6 +42,12 @@ func LoadConfig(content []byte) (*SystemAPIConfig, error) {
 	if err != nil {
 		return nil, err
 	}
+
+	// Apply default
+	if cfg.General.LogMaxEntries == 0 {
+		cfg.General.LogMaxEntries = DefaultLogMaxEntries
+	}
+
 	return cfg, nil
 }
 

@@ -53,14 +53,27 @@ func NewServer(log *httplog.Logger, cfg *SystemAPIConfig) (server *Server, err e
 		return nil, err
 	}
 
-	// Setup the pipe file
+	// Setup the named pipe for receiving events
 	if cfg.General.PipeFile != "" {
-		os.Remove(cfg.General.PipeFile)
-		err := syscall.Mknod(cfg.General.PipeFile, syscall.S_IFIFO|0o666, 0)
+		// If the file does not exist, create it. If it exists, ensure it is a named pipe.
+		stats, err := os.Stat(cfg.General.PipeFile)
 		if err != nil {
-			return nil, err
+			if os.IsNotExist(err) {
+				err := syscall.Mknod(cfg.General.PipeFile, syscall.S_IFIFO|0o666, 0)
+				if err != nil {
+					return nil, err
+				}
+			} else {
+				return nil, err
+			}
+		} else {
+			mode := stats.Mode()
+			if mode&os.ModeNamedPipe == 0 {
+				return nil, fmt.Errorf("file %s is not a named pipe", cfg.General.PipeFile)
+			}
 		}
 
+		// Start reading the pipe in the background
 		go server.readPipeInBackground()
 	}
 
@@ -98,13 +111,12 @@ func (s *Server) loadBasicAuthSecretFromFile() error {
 	}
 
 	s.basicAuthHash = string(secret)
-	if len(s.basicAuthHash) != 64 {
-		return fmt.Errorf("basic auth secret in %s does not look like a SHA256 hash (must be 64 characters)", s.cfg.General.BasicAuthSecretPath)
-	}
-
 	if len(secret) == 0 {
 		s.log.Info("Basic auth file without secret loaded, auth disabled until secret is configured", "file", s.cfg.General.BasicAuthSecretPath)
 	} else {
+		if len(s.basicAuthHash) != 64 {
+			return fmt.Errorf("basic auth secret in %s does not look like a SHA256 hash (must be 64 characters)", s.cfg.General.BasicAuthSecretPath)
+		}
 		s.log.Info("Basic auth enabled", "file", s.cfg.General.BasicAuthSecretPath)
 	}
 	return nil
@@ -180,10 +192,6 @@ func (s *Server) Shutdown(ctx context.Context) error {
 
 	if err := s.srv.Shutdown(ctx); err != nil {
 		s.log.Error("HTTP server shutdown failed", "err", err)
-	}
-
-	if s.cfg.General.PipeFile != "" {
-		os.Remove(s.cfg.General.PipeFile)
 	}
 
 	s.log.Info("HTTP server shutdown")

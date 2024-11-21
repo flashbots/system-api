@@ -53,9 +53,9 @@ func runCli(cCtx *cli.Context) (err error) {
 	pipeFile := cCtx.String("pipe-file")
 
 	// Create configuration file (load from file if requested)
-	config := systemapi.NewSystemAPIConfig()
+	config := systemapi.NewConfig()
 	if configFile != "" {
-		config, err = systemapi.LoadConfigFromFile(configFile)
+		config, err = systemapi.NewConfigFromFile(configFile)
 		if err != nil {
 			fmt.Println("Error loading config", err)
 			return err

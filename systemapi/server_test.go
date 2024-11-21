@@ -156,7 +156,7 @@ func TestBasicAuth(t *testing.T) {
 }
 
 func TestMaxEntries(t *testing.T) {
-	// Verify maximum number of log entries is working correctly
+	// Ensure maximum number of log entries is working correctly
 	maxEntries := 5
 
 	cfg := NewConfig()
@@ -176,4 +176,38 @@ func TestMaxEntries(t *testing.T) {
 	require.Equal(t, "3", srv.events[2].Message)
 	require.Equal(t, "4", srv.events[3].Message)
 	require.Equal(t, "5", srv.events[4].Message)
+}
+
+func TestAddEntryMessageParsing(t *testing.T) {
+	// Ensure that messages with timestamps are correctly parsed
+	srv := newTestServer(t)
+
+	testTime1 := time.Date(2021, 1, 2, 3, 4, 5, 0, time.UTC)
+	testTime2 := time.Date(2022, 1, 2, 3, 4, 6, 0, time.UTC)
+	testTime2TimestampSec := testTime2.Unix()
+	testTime2TimestampMs := testTime2.UnixMilli()
+
+	// Add messages
+	srv.addEvent(Event{ReceivedAt: testTime1, Message: "1"})                                                // regular message
+	srv.addEvent(Event{ReceivedAt: testTime1, Message: fmt.Sprintf("%d 2", testTime2TimestampSec)})         // custom timestamp
+	srv.addEvent(Event{ReceivedAt: testTime1, Message: fmt.Sprintf("%d \t  3  \t ", testTime2TimestampMs)}) // custom timestamp, with whitespace to test trimming
+
+	// Add empty messages to ensure they are ignored
+	srv.addEvent(Event{ReceivedAt: testTime1, Message: ""})      // empty message
+	srv.addEvent(Event{ReceivedAt: testTime1, Message: "  \t "}) // empty message
+
+	// 3 proper entries were added
+	require.Len(t, srv.events, 3)
+
+	// Check entry 1 (regular message)
+	require.Equal(t, "1", srv.events[0].Message)
+	require.Equal(t, testTime1, srv.events[0].ReceivedAt)
+
+	// Check entry 2 (timestamp in seconds)
+	require.Equal(t, "2", srv.events[1].Message)
+	require.Equal(t, testTime2, srv.events[1].ReceivedAt)
+
+	// Check entry 3 (timestamp in milliseconds)
+	require.Equal(t, "3", srv.events[2].Message) // check that whitespace was trimmed
+	require.Equal(t, testTime2, srv.events[2].ReceivedAt)
 }

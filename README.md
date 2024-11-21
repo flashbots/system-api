@@ -63,10 +63,31 @@ $ curl localhost:3535/logs
 2024-10-23T12:04:07Z     this is a test
 ```
 
- ## Actions
+#### Event timestamps
 
- Actions are shell commands that can be executed via API. The commands are defined in the config file,
- see [systemapi-config.toml](./systemapi-config.toml) for examples.
+By default, events are timestamped with the current time. However, the timestamp can be overridden by
+providing a valid unix timestamp (in seconds or milliseconds) as first part of the message:
+
+```bash
+# Start the server
+$ go run cmd/system-api/main.go
+
+# Add regular event
+$ echo "hello world" > pipe.fifo
+
+# Add event with custom timestamp
+$ echo "1634966400 this is a test" > pipe.fifo
+
+# Query events
+$ curl localhost:3535/logs
+2024-11-21T19:48:04Z     hello world
+2021-10-23T05:20:00Z     this is a test          <--- custom timestamp on this entry
+```
+
+## Actions
+
+Actions are shell commands that can be executed via API. The commands are defined in the config file,
+see [systemapi-config.toml](./systemapi-config.toml) for examples.
 
 Actions are recorded in the event log.
 

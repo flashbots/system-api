@@ -12,6 +12,7 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"strconv"
 	"strings"
 	"sync"
 	"syscall"
@@ -205,11 +206,34 @@ func (s *Server) handleLivenessCheck(w http.ResponseWriter, r *http.Request) {
 func (s *Server) addEvent(event Event) {
 	// Add event to the list and prune if necessary
 	s.eventsLock.Lock()
+	defer s.eventsLock.Unlock()
+
+	// Trim whitespace from the message
+	event.Message = strings.TrimSpace(event.Message)
+	if len(event.Message) == 0 {
+		return
+	}
+
+	// Check for custom timestamp. If the first part of the message is a timestamp, use it instead of the current time.
+	// To be a timestamp, this must be an integer with 10 characters for seconds or 13 for milliseconds.
+	timestampStr := strings.Fields(event.Message)[0] // split by whitespace and take the first part
+	timeInt, err := strconv.ParseInt(timestampStr, 10, 64)
+	if err == nil {
+		if len(timestampStr) == 10 {
+			// timestamp in seconds, update event
+			event.ReceivedAt = time.Unix(timeInt, 0).UTC()
+			event.Message = strings.TrimSpace(event.Message[len(timestampStr):])
+		} else if len(timestampStr) == 13 {
+			// timestamp in milliseconds, update event
+			event.ReceivedAt = time.UnixMilli(timeInt).UTC()
+			event.Message = strings.TrimSpace(event.Message[len(timestampStr):])
+		}
+	}
+
 	s.events = append(s.events, event)
 	if len(s.events) > s.cfg.General.LogMaxEntries {
 		s.events = s.events[1:]
 	}
-	s.eventsLock.Unlock()
 }
 
 func (s *Server) addInternalEvent(msg string) {

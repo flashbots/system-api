@@ -24,7 +24,7 @@ func getTestLogger() *httplog.Logger {
 
 func newTestServer(t *testing.T) *Server {
 	t.Helper()
-	srv, err := NewServer(getTestLogger(), NewSystemAPIConfig())
+	srv, err := NewServer(getTestLogger(), NewConfig())
 	require.NoError(t, err)
 	return srv
 }
@@ -102,7 +102,7 @@ func TestBasicAuth(t *testing.T) {
 	basicAuthSecretHash := hex.EncodeToString(h.Sum(nil))
 
 	// Create the config
-	cfg := NewSystemAPIConfig()
+	cfg := NewConfig()
 	cfg.General.BasicAuthSecretPath = tempDir + "/basic_auth_secret"
 	cfg.General.BasicAuthSecretSalt = basicAuthSalt
 

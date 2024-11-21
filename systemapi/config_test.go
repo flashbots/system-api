@@ -8,7 +8,7 @@ import (
 
 func TestLoadConfig(t *testing.T) {
 	path := "../systemapi-config.toml"
-	cfg, err := LoadConfigFromFile(path)
+	cfg, err := NewConfigFromFile(path)
 	require.NoError(t, err)
 	require.NotNil(t, cfg)
 	require.NotEmpty(t, cfg.Actions)
@@ -16,7 +16,7 @@ func TestLoadConfig(t *testing.T) {
 }
 
 func TestEmptyConfig(t *testing.T) {
-	cfg, err := LoadConfig([]byte{})
+	cfg, err := NewConfigFromTOML([]byte{})
 	require.NoError(t, err)
 	require.NotNil(t, cfg)
 	require.Equal(t, DefaultLogMaxEntries, cfg.General.LogMaxEntries)

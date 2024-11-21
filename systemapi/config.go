@@ -3,8 +3,11 @@ package systemapi
 import (
 	"os"
 
+	"github.com/flashbots/system-api/common"
 	toml "github.com/pelletier/go-toml/v2"
 )
+
+var DefaultLogMaxEntries = common.GetEnvInt("MAX_EVENTS", 1000)
 
 type systemAPIConfigGeneral struct {
 	ListenAddr    string `toml:"listen_addr"`
@@ -28,33 +31,36 @@ type SystemAPIConfig struct {
 	FileUploads map[string]string `toml:"file_uploads"`
 }
 
-func LoadConfigFromFile(path string) (*SystemAPIConfig, error) {
+func NewConfig() *SystemAPIConfig {
+	return &SystemAPIConfig{
+		General: systemAPIConfigGeneral{
+			LogMaxEntries: DefaultLogMaxEntries,
+		},
+		Actions:     make(map[string]string),
+		FileUploads: make(map[string]string),
+	}
+}
+
+func NewConfigFromFile(path string) (*SystemAPIConfig, error) {
 	content, err := os.ReadFile(path)
 	if err != nil {
 		return nil, err
 	}
-	return LoadConfig(content)
+	return NewConfigFromTOML(content)
 }
 
-func LoadConfig(content []byte) (*SystemAPIConfig, error) {
+func NewConfigFromTOML(content []byte) (*SystemAPIConfig, error) {
 	cfg := &SystemAPIConfig{}
 	err := toml.Unmarshal(content, cfg)
 	if err != nil {
 		return nil, err
 	}
-
-	// Apply default
-	if cfg.General.LogMaxEntries == 0 {
-		cfg.General.LogMaxEntries = DefaultLogMaxEntries
-	}
-
+	cfg.loadDefaults()
 	return cfg, nil
 }
 
-func NewSystemAPIConfig() *SystemAPIConfig {
-	return &SystemAPIConfig{
-		General:     systemAPIConfigGeneral{},
-		Actions:     make(map[string]string),
-		FileUploads: make(map[string]string),
+func (cfg *SystemAPIConfig) loadDefaults() {
+	if cfg.General.LogMaxEntries == 0 {
+		cfg.General.LogMaxEntries = DefaultLogMaxEntries
 	}
 }

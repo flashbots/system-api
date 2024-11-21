@@ -4,11 +4,13 @@ import (
 	"bytes"
 	"crypto/sha256"
 	"encoding/hex"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
 	"os"
 	"testing"
+	"time"
 
 	"github.com/flashbots/system-api/common"
 	"github.com/go-chi/httplog/v2"
@@ -151,4 +153,27 @@ func TestBasicAuth(t *testing.T) {
 	require.Equal(t, http.StatusUnauthorized, code)
 	code, _ = reqGetLiveZ("admin", "foo", nil)
 	require.Equal(t, http.StatusUnauthorized, code)
+}
+
+func TestMaxEntries(t *testing.T) {
+	// Verify maximum number of log entries is working correctly
+	maxEntries := 5
+
+	cfg := NewConfig()
+	cfg.General.LogMaxEntries = maxEntries
+	srv, err := NewServer(getTestLogger(), cfg)
+	require.NoError(t, err)
+
+	// Add 6 events, only last 5 should be stored
+	for i := range 6 {
+		srv.addEvent(Event{ReceivedAt: time.Now(), Message: fmt.Sprint(i)}) //nolint:perfsprint
+	}
+
+	// Ensure only 5 events are stored
+	require.Len(t, srv.events, 5)
+	require.Equal(t, "1", srv.events[0].Message) // originally, 0 was written to this position, but has been overwritten
+	require.Equal(t, "2", srv.events[1].Message)
+	require.Equal(t, "3", srv.events[2].Message)
+	require.Equal(t, "4", srv.events[3].Message)
+	require.Equal(t, "5", srv.events[4].Message)
 }

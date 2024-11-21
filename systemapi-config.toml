@@ -16,6 +16,12 @@ basic_auth_secret_salt = "D;%yL9TS:5PalS/d"      # use a random string for the s
 # http_read_timeout_ms = 2500
 # http_write_timeout_ms = 2500
 
+# TLS configuration
+tls_enabled = true
+tls_cert_path = "cert.pem"
+tls_key_path = "key.pem"
+tls_create_if_missing = true
+
 [actions]
 echo_test = "echo test"
 # reboot = "reboot"

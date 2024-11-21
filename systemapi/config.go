@@ -22,6 +22,11 @@ type systemAPIConfigGeneral struct {
 
 	HTTPReadTimeoutMillis  int `toml:"http_read_timeout_ms"`
 	HTTPWriteTimeoutMillis int `toml:"http_write_timeout_ms"`
+
+	TLSEnabled         bool   `toml:"tls_enabled"`
+	TLSCertPath        string `toml:"tls_cert_path"`
+	TLSKeyPath         string `toml:"tls_key_path"`
+	TLSCreateIfMissing bool   `toml:"tls_create_if_missing"`
 }
 
 type SystemAPIConfig struct {

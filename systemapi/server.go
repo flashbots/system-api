@@ -77,6 +77,14 @@ func NewServer(log *httplog.Logger, cfg *SystemAPIConfig) (server *Server, err e
 		go server.readPipeInBackground()
 	}
 
+	// Load or create TLS certificate
+	if cfg.General.TLSEnabled {
+		err = server.loadOrCreateTLSCert()
+		if err != nil {
+			return nil, err
+		}
+	}
+
 	// Create the HTTP server
 	server.srv = &http.Server{
 		Addr:         cfg.General.ListenAddr,

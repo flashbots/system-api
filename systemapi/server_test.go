@@ -188,9 +188,9 @@ func TestAddEntryMessageParsing(t *testing.T) {
 	testTime2TimestampMs := testTime2.UnixMilli()
 
 	// Add messages
-	srv.addEvent(Event{ReceivedAt: testTime1, Message: "1"})                                                // regular message
-	srv.addEvent(Event{ReceivedAt: testTime1, Message: fmt.Sprintf("%d 2", testTime2TimestampSec)})         // custom timestamp
-	srv.addEvent(Event{ReceivedAt: testTime1, Message: fmt.Sprintf("%d \t  3  \t ", testTime2TimestampMs)}) // custom timestamp, with whitespace to test trimming
+	srv.addEvent(Event{ReceivedAt: testTime1, Message: "1"})                                                 // regular message
+	srv.addEvent(Event{ReceivedAt: testTime1, Message: fmt.Sprintf("%d 2", testTime2TimestampSec)})          // custom timestamp
+	srv.addEvent(Event{ReceivedAt: testTime1, Message: fmt.Sprintf("  %d \t 3  \t ", testTime2TimestampMs)}) // custom timestamp, with whitespace to test trimming
 
 	// Add empty messages to ensure they are ignored
 	srv.addEvent(Event{ReceivedAt: testTime1, Message: ""})      // empty message
@@ -204,10 +204,10 @@ func TestAddEntryMessageParsing(t *testing.T) {
 	require.Equal(t, testTime1, srv.events[0].ReceivedAt)
 
 	// Check entry 2 (timestamp in seconds)
-	require.Equal(t, "2", srv.events[1].Message)
+	require.Equal(t, fmt.Sprintf("%d 2", testTime2TimestampSec), srv.events[1].Message)
 	require.Equal(t, testTime2, srv.events[1].ReceivedAt)
 
 	// Check entry 3 (timestamp in milliseconds)
-	require.Equal(t, "3", srv.events[2].Message) // check that whitespace was trimmed
+	require.Equal(t, fmt.Sprintf("%d \t 3", testTime2TimestampMs), srv.events[2].Message) // check that whitespace was trimmed
 	require.Equal(t, testTime2, srv.events[2].ReceivedAt)
 }

@@ -222,11 +222,9 @@ func (s *Server) addEvent(event Event) {
 		if len(timestampStr) == 10 {
 			// timestamp in seconds, update event
 			event.ReceivedAt = time.Unix(timeInt, 0).UTC()
-			event.Message = strings.TrimSpace(event.Message[len(timestampStr):])
 		} else if len(timestampStr) == 13 {
 			// timestamp in milliseconds, update event
 			event.ReceivedAt = time.UnixMilli(timeInt).UTC()
-			event.Message = strings.TrimSpace(event.Message[len(timestampStr):])
 		}
 	}
 

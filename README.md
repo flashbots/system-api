@@ -80,8 +80,8 @@ $ echo "1634966400 this is a test" > pipe.fifo
 
 # Query events
 $ curl localhost:3535/logs
-2024-11-21T19:48:04Z     hello world
-2021-10-23T05:20:00Z     this is a test          <--- custom timestamp on this entry
+2024-11-22T13:50:09Z     hello world
+2021-10-23T05:20:00Z     1634966400 this is a test      <--- custom timestamp on this entry
 ```
 
 ## Actions

@@ -13,6 +13,13 @@ func TestLoadConfig(t *testing.T) {
 	require.NotNil(t, cfg)
 	require.NotEmpty(t, cfg.Actions)
 	require.Equal(t, "echo test", cfg.Actions["echo_test"])
+
+	// check TLS config
+	require.True(t, cfg.General.TLSEnabled)
+	require.True(t, cfg.General.TLSCreateIfMissing)
+	require.NotEmpty(t, cfg.General.TLSCertHosts)
+	require.NotEmpty(t, cfg.General.TLSCertPath)
+	require.NotEmpty(t, cfg.General.TLSKeyPath)
 }
 
 func TestEmptyConfig(t *testing.T) {

@@ -10,23 +10,24 @@ import (
 var DefaultLogMaxEntries = common.GetEnvInt("MAX_EVENTS", 1000)
 
 type systemAPIConfigGeneral struct {
-	ListenAddr    string `toml:"listen_addr"`
-	PipeFile      string `toml:"pipe_file"`
-	LogJSON       bool   `toml:"log_json"`
-	LogDebug      bool   `toml:"log_debug"`
+	ListenAddr    string `toml:"listen_addr"`     // Address (host and port) for server to listen on
+	PipeFile      string `toml:"pipe_file"`       // Path for the named pipe file
+	LogJSON       bool   `toml:"log_json"`        // Enables JSON logging
+	LogDebug      bool   `toml:"log_debug"`       // Enables debug logging
 	EnablePprof   bool   `toml:"pprof"`           // Enables pprof endpoints
 	LogMaxEntries int    `toml:"log_max_entries"` // Maximum number of log entries
 
-	BasicAuthSecretPath string `toml:"basic_auth_secret_path"`
-	BasicAuthSecretSalt string `toml:"basic_auth_secret_salt"`
+	BasicAuthSecretPath string `toml:"basic_auth_secret_path"` // Path to the file containing the basic auth secret hash
+	BasicAuthSecretSalt string `toml:"basic_auth_secret_salt"` // Path to the file containing the basic auth secret salt
 
-	HTTPReadTimeoutMillis  int `toml:"http_read_timeout_ms"`
-	HTTPWriteTimeoutMillis int `toml:"http_write_timeout_ms"`
+	HTTPReadTimeoutMillis  int `toml:"http_read_timeout_ms"`  // A zero or negative value means there will be no timeout.
+	HTTPWriteTimeoutMillis int `toml:"http_write_timeout_ms"` // A zero or negative value means there will be no timeout.
 
-	TLSEnabled         bool   `toml:"tls_enabled"`
-	TLSCertPath        string `toml:"tls_cert_path"`
-	TLSKeyPath         string `toml:"tls_key_path"`
-	TLSCreateIfMissing bool   `toml:"tls_create_if_missing"`
+	TLSEnabled         bool     `toml:"tls_enabled"`           // Enable TLS
+	TLSCreateIfMissing bool     `toml:"tls_create_if_missing"` // Create TLS cert and key files if they do not exist
+	TLSCertHosts       []string `toml:"tls_cert_hosts"`        // Hosts for the TLS cert
+	TLSCertPath        string   `toml:"tls_cert_path"`         // Path to the TLS cert file
+	TLSKeyPath         string   `toml:"tls_key_path"`          // Path to the TLS key file
 }
 
 type SystemAPIConfig struct {

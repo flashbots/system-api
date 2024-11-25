@@ -18,9 +18,10 @@ basic_auth_secret_salt = "D;%yL9TS:5PalS/d"      # use a random string for the s
 
 # TLS configuration
 tls_enabled = true
+tls_create_if_missing = true
+tls_cert_hosts = ["localhost", ""]
 tls_cert_path = "cert.pem"
 tls_key_path = "key.pem"
-tls_create_if_missing = true
 
 [actions]
 echo_test = "echo test"

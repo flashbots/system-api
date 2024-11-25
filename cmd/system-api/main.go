@@ -96,7 +96,7 @@ func runCli(cCtx *cli.Context) (err error) {
 		log.Error("Error creating server", "err", err)
 		return err
 	}
-	go server.Start()
+	go server.Start() //nolint:errcheck
 
 	// Wait for signal, then graceful shutdown
 	exit := make(chan os.Signal, 1)

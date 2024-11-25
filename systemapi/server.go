@@ -79,8 +79,9 @@ func NewServer(log *httplog.Logger, cfg *SystemAPIConfig) (server *Server, err e
 
 	// Load or create TLS certificate
 	if cfg.General.TLSEnabled {
-		err = server.loadOrCreateTLSCert()
+		err = server.createTLSCertIfNotExists()
 		if err != nil {
+			server.log.Error("Failed to create TLS certificate", "err", err)
 			return nil, err
 		}
 	}
@@ -188,11 +189,20 @@ func (s *Server) readPipeInBackground() {
 	}
 }
 
-func (s *Server) Start() {
+func (s *Server) Start() (err error) {
 	s.log.Info("Starting HTTP server", "listenAddress", s.cfg.General.ListenAddr)
-	if err := s.srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
-		s.log.Error("HTTP server failed", "err", err)
+
+	if s.cfg.General.TLSEnabled {
+		s.log.Info("TLS enabled", "cert", s.cfg.General.TLSCertPath, "key", s.cfg.General.TLSKeyPath)
+		err = s.srv.ListenAndServeTLS(s.cfg.General.TLSCertPath, s.cfg.General.TLSKeyPath)
+	} else {
+		err = s.srv.ListenAndServe()
 	}
+	if err != nil && !errors.Is(err, http.ErrServerClosed) {
+		s.log.Error("HTTP server failed", "err", err)
+		return err
+	}
+	return nil
 }
 
 func (s *Server) Shutdown(ctx context.Context) error {

@@ -3,9 +3,9 @@
 [![Goreport status](https://goreportcard.com/badge/github.com/flashbots/system-api)](https://goreportcard.com/report/github.com/flashbots/system-api)
 [![Test status](https://github.com/flashbots/system-api/actions/workflows/checks.yml/badge.svg?branch=main)](https://github.com/flashbots/system-api/actions?query=workflow%3A%22Checks%22)
 
-System API is an interface between TDX VMs and it's services and the operator.
+System API is an interface between TDX VM services and the operator.
 
-It currently does the following things:
+Features:
 
 - **Event log**: Services inside a TDX instance can record events they want exposed to the operator
  used to record and query events. Useful to record service startup/shutdown, errors, progress updates,
@@ -13,7 +13,12 @@ It currently does the following things:
 - **Actions**: Ability to execute shell commands via API
 - **Configuration** through file uploads
 - **HTTP Basic Auth** for API endpoints
-- All actions show up in the event log
+- **TLS** support
+- Configuration through config file (see [`systemapi-config.toml`](./systemapi-config.toml))
+
+Notes:
+
+- Actions and file uploads show up in the event log
 
 ---
 

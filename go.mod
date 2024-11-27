@@ -6,6 +6,7 @@ toolchain go1.23.1
 
 require (
 	github.com/ethereum/go-ethereum v1.14.9
+	github.com/flashbots/go-utils v0.8.2
 	github.com/go-chi/chi/v5 v5.1.0
 	github.com/go-chi/httplog/v2 v2.1.1
 	github.com/pelletier/go-toml/v2 v2.2.3

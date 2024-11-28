@@ -3,7 +3,7 @@
 [![Goreport status](https://goreportcard.com/badge/github.com/flashbots/system-api)](https://goreportcard.com/report/github.com/flashbots/system-api)
 [![Test status](https://github.com/flashbots/system-api/actions/workflows/checks.yml/badge.svg?branch=main)](https://github.com/flashbots/system-api/actions?query=workflow%3A%22Checks%22)
 
-System API is an interface between TDX VM services and the operator.
+An interface between TDX VM services and the operator. Used in [BuilderNet](https://buildernet.org/).
 
 Features:
 
@@ -11,13 +11,13 @@ Features:
  used to record and query events. Useful to record service startup/shutdown, errors, progress updates,
  hashes, etc.
 - **Actions**: Ability to execute shell commands via API
-- **Configuration** through file uploads
-- **HTTP Basic Auth** for API endpoints
-- **TLS** support
-- Configuration through config file (see [`systemapi-config.toml`](./systemapi-config.toml))
+- **File uploads**
+- **HTTP Basic Auth** support
+- **TLS encryption support**
 
 Notes:
 
+- Configuration through config file (see [`systemapi-config.toml`](./systemapi-config.toml))
 - Actions and file uploads show up in the event log
 
 ---
@@ -68,6 +68,8 @@ $ curl localhost:3535/logs
 2024-10-23T12:04:07Z     this is a test
 ```
 
+---
+
  ## Actions
 
  Actions are shell commands that can be executed via API. The commands are defined in the config file,
@@ -83,6 +85,8 @@ $ go run cmd/system-api/main.go --config systemapi-config.toml
 $ curl -v localhost:3535/api/v1/actions/echo_test
 ```
 
+---
+
 ## File Uploads
 
 Upload destinations are defined in the config file (see [systemapi-config.toml](./systemapi-config.toml)).
@@ -97,6 +101,8 @@ $ go run cmd/system-api/main.go --config systemapi-config.toml
 $ curl -v -X POST -d "@README.md" localhost:3535/api/v1/file-upload/testfile
 ```
 
+---
+
 ## HTTP Basic Auth
 
 All API endpoints can be protected with HTTP Basic Auth.
@@ -106,10 +112,12 @@ either via file or via API. If the secret is configured via API, the salted SHA2
 hash is be stored in a file (specified in the config file) to enable basic auth protection
 across restarts.
 
-The config file ([systemapi-config.toml](./systemapi-config.toml)) includes a `basic_auth_secret_path`.
-- If the file exists and is not empty, then the APIs are authenticated for passwords that match the hash in this file.
+The config file ([systemapi-config.toml](./systemapi-config.toml)) includes `basic_auth_secret_path` (and `basic_auth_secret_salt`).
+- If the file exists and is not empty, then the APIs are authenticated for passwords that match the salted hash in this file.
 - If the file exists and is empty, then the APIs are unauthenticated until a secret is configured.
 - If this file is specified but doesn't exist, system-api will create it (empty).
+
+Example:
 
 ```bash
 # The included systemapi-config.toml uses basic-auth-secret.txt for basic_auth_secret_path
@@ -136,3 +144,26 @@ curl -v -u admin:foobar localhost:3535/livez
 # The update also shows up in the logs
 curl -u admin:foobar localhost:3535/logs
 ```
+
+---
+
+## TLS encryption support
+
+TLS encryption is supported. System-API can load the certificate and key from local files (which it can also generate if missing).
+
+The config file ([systemapi-config.toml](./systemapi-config.toml)) includes `tls_cert_path` and `tls_key_path` for the certificate and key files, and
+a few other options:
+
+```toml
+[general]
+# TLS configuration
+tls_enabled = true
+tls_create_if_missing = true
+tls_cert_hosts = ["localhost", ""]
+tls_cert_path = "cert.pem"
+tls_key_path = "key.pem"
+```
+
+If `tls_enabled` is set to `false`, TLS is disabled and regular HTTP requests will work just fine. If `tls_enabled` is set to `true`, requests will be served over HTTPS.
+
+If `tls_create_if_missing` is set to `true`, system-api will generate a self-signed certificate and key if the files are missing. If set to `false`, system-api will fail to start if the files are missing.

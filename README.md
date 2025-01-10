@@ -36,7 +36,7 @@ curl localhost:3535/api/v1/new_event?message=this+is+a+test
 curl -v localhost:3535/api/v1/actions/echo_test
 
 # upload files
-curl -v -X POST -d "@README.md" localhost:3535/api/v1/file-upload/testfile
+curl -v --data-binary "@README.md" localhost:3535/api/v1/file-upload/testfile
 
 # get event log
 curl localhost:3535/logs
@@ -98,7 +98,7 @@ File uploads are recorded in the event log.
 $ go run cmd/system-api/main.go --config systemapi-config.toml
 
 # Execute the example action
-$ curl -v -X POST -d "@README.md" localhost:3535/api/v1/file-upload/testfile
+$ curl -v --data-binary "@README.md" localhost:3535/api/v1/file-upload/testfile
 ```
 
 ---

@@ -127,22 +127,25 @@ cat systemapi-config.toml
 go run cmd/system-api/main.go --config systemapi-config.toml
 
 # Initially, requests are unauthenticated
-curl -v localhost:3535/livez
+curl -v --insecure https://localhost:3535/livez
 
 # Set the basic auth secret. From here on, authentication is required for all API requests.
-curl -d "foobar" localhost:3535/api/v1/set-basic-auth
+curl -v --insecure --data "foobar" https://localhost:3535/api/v1/set-basic-auth
 
 # Check that hash was written to the file
 cat basic-auth-secret.txt
 
 # API calls with no basic auth credentials are provided fail now, with '401 Unauthorized' because
-curl -v localhost:3535/livez
+curl -v --insecure https://localhost:3535/livez
 
 # API calls work if correct basic auth credentials are provided
-curl -v -u admin:foobar localhost:3535/livez
+curl -v --user admin:foobar https://localhost:3535/livez
 
 # The update also shows up in the logs
-curl -u admin:foobar localhost:3535/logs
+curl --user admin:foobar https://localhost:3535/logs
+
+# You can also update the basic auth secret:
+curl -v --insecure --user admin:foobar --data "new_secret" https://localhost:3535/api/v1/set-basic-auth
 ```
 
 ---

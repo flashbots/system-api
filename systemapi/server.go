@@ -39,6 +39,11 @@ type Server struct {
 	basicAuthHash string
 }
 
+type httpErrorResp struct {
+	Code    int    `json:"code"`
+	Message string `json:"message"`
+}
+
 func NewServer(log *httplog.Logger, cfg *SystemAPIConfig) (server *Server, err error) {
 	server = &Server{
 		cfg:    cfg,
@@ -217,7 +222,9 @@ func (s *Server) Shutdown(ctx context.Context) error {
 }
 
 func (s *Server) handleLivenessCheck(w http.ResponseWriter, r *http.Request) {
-	w.WriteHeader(http.StatusOK)
+	s.respondOKJSON(w, map[string]string{
+		"status": "ok",
+	})
 }
 
 func (s *Server) addEvent(event Event) {
@@ -284,6 +291,25 @@ func (s *Server) handleGetEvents(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusOK)
 }
 
+func (s *Server) respondErrorJSON(w http.ResponseWriter, code int, message string) {
+	w.Header().Set(HeaderContentType, MediaTypeJSON)
+	w.WriteHeader(code)
+	resp := httpErrorResp{code, message}
+	if err := json.NewEncoder(w).Encode(resp); err != nil {
+		s.log.With("response", resp, "error", err).Error("could not write error response")
+		http.Error(w, "", http.StatusInternalServerError)
+	}
+}
+
+func (s *Server) respondOKJSON(w http.ResponseWriter, response any) {
+	w.Header().Set(HeaderContentType, MediaTypeJSON)
+	w.WriteHeader(http.StatusOK)
+	if err := json.NewEncoder(w).Encode(response); err != nil {
+		s.log.With("response", response, "error", err).Error("could not write OK response")
+		http.Error(w, "", http.StatusInternalServerError)
+	}
+}
+
 func (s *Server) handleGetLogs(w http.ResponseWriter, r *http.Request) {
 	s.writeEventsAsText(w)
 }
@@ -293,13 +319,13 @@ func (s *Server) handleAction(w http.ResponseWriter, r *http.Request) {
 	s.log.Info("Received action", "action", action)
 
 	if s.cfg == nil {
-		w.WriteHeader(http.StatusNotImplemented)
+		s.respondErrorJSON(w, http.StatusNotImplemented, "Action not configured")
 		return
 	}
 
 	cmd, ok := s.cfg.Actions[action]
 	if !ok {
-		w.WriteHeader(http.StatusBadRequest)
+		s.respondErrorJSON(w, http.StatusBadRequest, "Specified action not configured")
 		return
 	}
 
@@ -310,13 +336,15 @@ func (s *Server) handleAction(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		s.log.Error("Failed to execute action", "action", action, "cmd", cmd, "err", err, "stderr", stderr)
 		s.addInternalEvent("error executing action: " + action + " - error: " + err.Error() + " (stderr: " + stderr + ")")
-		w.WriteHeader(http.StatusInternalServerError)
+		s.respondErrorJSON(w, http.StatusInternalServerError, "Failed to execute action: "+action+" - error: "+err.Error())
 		return
 	}
 
 	s.log.Info("Action executed", "action", action, "cmd", cmd, "stdout", stdout, "stderr", stderr)
 	s.addInternalEvent("executing action success: " + action + " = " + cmd)
-	w.WriteHeader(http.StatusOK)
+	s.respondOKJSON(w, map[string]string{
+		"message": "Action executed successfully",
+	})
 }
 
 func (s *Server) handleFileUpload(w http.ResponseWriter, r *http.Request) {
@@ -325,13 +353,13 @@ func (s *Server) handleFileUpload(w http.ResponseWriter, r *http.Request) {
 	log.Info("Receiving file upload")
 
 	if s.cfg == nil {
-		w.WriteHeader(http.StatusNotImplemented)
+		s.respondErrorJSON(w, http.StatusNotImplemented, "File upload not configured")
 		return
 	}
 
 	filename, ok := s.cfg.FileUploads[fileArg]
 	if !ok {
-		w.WriteHeader(http.StatusBadRequest)
+		s.respondErrorJSON(w, http.StatusBadRequest, "Specified file upload not configured")
 		return
 	}
 
@@ -343,7 +371,7 @@ func (s *Server) handleFileUpload(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		log.Error("Failed to read content from payload", "err", err)
 		s.addInternalEvent("file upload error (failed to read): " + fileArg + " = " + filename + " - error: " + err.Error())
-		w.WriteHeader(http.StatusInternalServerError)
+		s.respondErrorJSON(w, http.StatusInternalServerError, "Failed to read content from payload")
 		return
 	}
 
@@ -354,17 +382,22 @@ func (s *Server) handleFileUpload(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		log.Error("Failed to write content to file", "err", err)
 		s.addInternalEvent("file upload error (failed to write): " + fileArg + " = " + filename + " - error: " + err.Error())
-		w.WriteHeader(http.StatusInternalServerError)
+		s.respondErrorJSON(w, http.StatusInternalServerError, "Failed to write content to file")
 		return
 	}
 
 	log.Info("File uploaded")
 	s.addInternalEvent(fmt.Sprintf("file upload success: %s = %s - content: %d bytes", fileArg, filename, len(content)))
-	w.WriteHeader(http.StatusOK)
+	s.respondOKJSON(w, map[string]string{
+		"message":    "File uploaded successfully",
+		"file":       filename,
+		"size_bytes": fmt.Sprint(len(content)), //nolint:perfsprint
+	})
 }
 
+// getBasicAuthHashedCredentials returns the hashed credentials for the basic auth middleware (on every request).
+// It is dynamic because the secret can be set/updated during runtime.
 func (s *Server) getBasicAuthHashedCredentials() map[string]string {
-	// dynamic because can be set at runtime
 	hashedCredentials := make(map[string]string)
 	if s.basicAuthHash != "" {
 		hashedCredentials["admin"] = s.basicAuthHash
@@ -404,5 +437,7 @@ func (s *Server) handleSetBasicAuthCreds(w http.ResponseWriter, r *http.Request)
 	s.basicAuthHash = secretHash
 	s.log.Info("Basic auth secret updated")
 	s.addInternalEvent("basic auth secret updated. new hash: " + secretHash)
-	w.WriteHeader(http.StatusOK)
+	s.respondOKJSON(w, map[string]string{
+		"message": "Basic auth secret updated",
+	})
 }

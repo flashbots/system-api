@@ -4,6 +4,7 @@ import (
 	"crypto/sha256"
 	"crypto/subtle"
 	"encoding/hex"
+	"encoding/json"
 	"fmt"
 	"net/http"
 )
@@ -47,6 +48,14 @@ func BasicAuth(realm, salt string, getHashedCredentials func() map[string]string
 }
 
 func basicAuthFailed(w http.ResponseWriter, realm string) {
-	w.Header().Add("WWW-Authenticate", fmt.Sprintf(`Basic realm="%s"`, realm))
+	w.Header().Set(HeaderWWWAuthenticate, fmt.Sprintf(`Basic realm="%s"`, realm))
+	w.Header().Set(HeaderContentType, MediaTypeJSON)
 	w.WriteHeader(http.StatusUnauthorized)
+	resp := httpErrorResp{
+		Code:    http.StatusUnauthorized,
+		Message: "Unauthorized",
+	}
+	if err := json.NewEncoder(w).Encode(resp); err != nil {
+		http.Error(w, "", http.StatusInternalServerError)
+	}
 }

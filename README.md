@@ -25,27 +25,33 @@ Notes:
 ## Getting started
 
 ```bash
-# start the server
+# Start the server
 make run
 
-# add events
+# Add events
 echo "hello world" > pipe.fifo
-curl localhost:3535/api/v1/new_event?message=this+is+a+test
+curl --insecure https://localhost:3535/api/v1/new_event?message=this+is+a+test
 
-# execute actions
-curl -v localhost:3535/api/v1/actions/echo_test
+# Execute actions
+curl --insecure https://localhost:3535/api/v1/actions/echo_test
 
-# upload files
-curl -v --data-binary "@README.md" localhost:3535/api/v1/file-upload/testfile
+# Upload files
+curl --insecure --data-binary "@README.md" https://localhost:3535/api/v1/file-upload/testfile
 
-# get event log
-curl localhost:3535/logs
+# Get event log
+curl --insecure https://localhost:3535/logs
 2024-11-05T22:03:23Z     hello world
 2024-11-05T22:03:26Z     this is a test
 2024-11-05T22:03:29Z     [system-api] executing action: echo_test = echo test
 2024-11-05T22:03:29Z     [system-api] executing action success: echo_test = echo test
 2024-11-05T22:03:31Z     [system-api] file upload: testfile = /tmp/testfile.txt
 2024-11-05T22:03:31Z     [system-api] file upload success: testfile = /tmp/testfile.txt - content: 1991 bytes
+
+# Set basic auth secret
+curl --insecure --data "foobar" https://localhost:3535/api/v1/set-basic-auth
+
+# Get logs with basic auth (otherwise will be rejected with Unauthorized)
+curl --insecure --user admin:foobar https://localhost:3535/logs
 ```
 
 ---
@@ -56,14 +62,14 @@ Events can be added via local named pipe (i.e. file `pipe.fifo`) or through HTTP
 
 ```bash
 # Start the server
-$ go run cmd/system-api/main.go
+$ make run
 
 # Add events
 $ echo "hello world" > pipe.fifo
-$ curl localhost:3535/api/v1/new_event?message=this+is+a+test
+$ curl --insecure https://localhost:3535/api/v1/new_event?message=this+is+a+test
 
 # Query events (plain text or JSON is supported)
-$ curl localhost:3535/logs
+$ curl --insecure https://localhost:3535/logs
 2024-10-23T12:04:01Z     hello world
 2024-10-23T12:04:07Z     this is a test
 ```
@@ -79,10 +85,10 @@ Actions are recorded in the event log.
 
 ```bash
 # Start the server
-$ go run cmd/system-api/main.go --config systemapi-config.toml
+$ make run
 
 # Execute the example action
-$ curl -v localhost:3535/api/v1/actions/echo_test
+$ curl --insecure https://localhost:3535/api/v1/actions/echo_test
 ```
 
 ---
@@ -95,10 +101,10 @@ File uploads are recorded in the event log.
 
 ```bash
 # Start the server
-$ go run cmd/system-api/main.go --config systemapi-config.toml
+$ make run
 
-# Execute the example action
-$ curl -v --data-binary "@README.md" localhost:3535/api/v1/file-upload/testfile
+# Upload the file
+$ curl --insecure --data-binary "@README.md" https://localhost:3535/api/v1/file-upload/testfile
 ```
 
 ---
@@ -124,28 +130,28 @@ Example:
 cat systemapi-config.toml
 
 # Start the server
-go run cmd/system-api/main.go --config systemapi-config.toml
+make run
 
 # Initially, requests are unauthenticated
-curl -v --insecure https://localhost:3535/livez
+curl --insecure https://localhost:3535/livez
 
 # Set the basic auth secret. From here on, authentication is required for all API requests.
-curl -v --insecure --data "foobar" https://localhost:3535/api/v1/set-basic-auth
+curl --insecure --data "foobar" https://localhost:3535/api/v1/set-basic-auth
 
 # Check that hash was written to the file
-cat basic-auth-secret.txt
+cat basic-auth-hash.txt
 
 # API calls with no basic auth credentials are provided fail now, with '401 Unauthorized' because
-curl -v --insecure https://localhost:3535/livez
+curl --insecure https://localhost:3535/livez
 
 # API calls work if correct basic auth credentials are provided
-curl -v --user admin:foobar https://localhost:3535/livez
+curl --insecure --user admin:foobar https://localhost:3535/livez
 
 # The update also shows up in the logs
-curl --user admin:foobar https://localhost:3535/logs
+curl --insecure --user admin:foobar https://localhost:3535/logs
 
 # You can also update the basic auth secret:
-curl -v --insecure --user admin:foobar --data "new_secret" https://localhost:3535/api/v1/set-basic-auth
+curl --insecure --user admin:foobar --data "new_secret" https://localhost:3535/api/v1/set-basic-auth
 ```
 
 ---

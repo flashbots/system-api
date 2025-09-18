@@ -68,7 +68,7 @@ func runCli(cCtx *cli.Context) error {
 		log.Error("http request error", "err", err)
 		return err
 	}
-	defer resp.Body.Close()
+	defer resp.Body.Close() //nolint:errcheck
 
 	respBody, err := io.ReadAll(resp.Body)
 	if err != nil {
